@@ -22,10 +22,18 @@ public class EmailServiceFactory : IEmailServiceFactory
 
     public IEmailService GetService(string provider)
     {
+        if (string.IsNullOrEmpty(provider))
+        {
+            throw new ArgumentException("Provider cannot be null or empty");
+        }
+
+        var cleanProvider = provider.Trim('"', ' ', '}', '{');
+
         if (!_services.TryGetValue(provider.ToLower(), out var service))
         {
             throw new ArgumentException($"Unknown email provider: {provider}");
         }
+
         return service;
     }
 }
