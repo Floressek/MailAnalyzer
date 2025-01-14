@@ -1,4 +1,7 @@
-﻿using Microsoft.Extensions.Logging;
+﻿using EmailAnalyzer.Client.Pages;
+using EmailAnalyzer.Client.Services;
+using EmailAnalyzer.Shared.Services;
+using Microsoft.Extensions.Logging;
 
 namespace EmailAnalyzer.Client;
 
@@ -14,6 +17,9 @@ public static class MauiProgram
 				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
 				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
 			});
+		
+		builder.Services.AddSingleton<ITokenStorageService, SecureTokenStorageService>();
+		builder.Services.AddTransient<LoginPage>();
 
 #if DEBUG
 		builder.Logging.AddDebug();

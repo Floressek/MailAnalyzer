@@ -1,0 +1,47 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="EmailAnalyzer.Client.Pages.LoginPage">
+    <Grid RowDefinitions="Auto,*,Auto" Padding="20">
+        <VerticalStackLayout Grid.Row="0" 
+                            Spacing="20"
+                            IsVisible="{Binding IsLoginVisible}">
+            <Label 
+                Text="Email Analyzer"
+                SemanticProperties.HeadingLevel="Level1"
+                FontSize="32"
+                HorizontalOptions="Center" />
+            
+            <Label 
+                Text="Connect your email accounts to start analyzing"
+                FontSize="18"
+                HorizontalOptions="Center" />
+                
+            <Button 
+                x:Name="OutlookButton"
+                Text="Connect Outlook"
+                Clicked="OnOutlookClicked"
+                HorizontalOptions="Center"/>
+            
+            <Button 
+                x:Name="GmailButton"
+                Text="Connect Gmail"
+                Clicked="OnGmailClicked"
+                HorizontalOptions="Center"/>
+        </VerticalStackLayout>
+
+        <!-- WebView do autoryzacji -->
+        <WebView Grid.Row="0" Grid.RowSpan="3"
+                x:Name="AuthWebView"
+                IsVisible="false"
+                Navigated="AuthWebView_Navigated"/>
+
+        <ActivityIndicator 
+            Grid.Row="1"
+            x:Name="LoadingIndicator"
+            IsRunning="False"
+            IsVisible="False"
+            HorizontalOptions="Center"
+            VerticalOptions="Center"/>
+    </Grid>
+</ContentPage>

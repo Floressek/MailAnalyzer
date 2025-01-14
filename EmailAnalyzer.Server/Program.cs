@@ -1,4 +1,6 @@
+using EmailAnalyzer.Server.Services;
 using EmailAnalyzer.Server.Services.Email;
+using EmailAnalyzer.Shared.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,7 +15,7 @@ builder.Services.Configure<OutlookConfiguration>(
 builder.Services.Configure<GmailConfiguration>(
     builder.Configuration.GetSection("Gmail"));
 
-// Rejestracja obu serwisów email
+// Rejestracja serwisów email
 builder.Services.AddScoped<OutlookEmailService>();
 builder.Services.AddScoped<GmailEmailService>();
 
@@ -25,6 +27,9 @@ builder.Services.AddScoped<IEmailServiceFactory>(sp =>
         gmail: sp.GetRequiredService<GmailEmailService>()
     );
 });
+
+// Rejestracja TokenStorageService dla serwera
+builder.Services.AddSingleton<ITokenStorageService, ServerTokenStorageService>();
 
 // Dodaj CORS
 builder.Services.AddCors(options =>
@@ -46,15 +51,19 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 }
 
-app.MapControllerRoute( // Added auth-callback route
+// Dodaj middleware w odpowiedniej kolejności
+app.UseCors("AllowAll");
+app.UseHttpsRedirection();
+app.UseRouting();
+app.UseAuthorization();
+
+// Konfiguracja routingu
+app.MapControllerRoute(
     name: "auth-callback",
     pattern: "auth/callback",
     defaults: new { controller = "Auth", action = "Callback" }
 );
 
-app.UseCors("AllowAll");
-app.UseHttpsRedirection();
-app.UseAuthorization();
 app.MapControllers();
 
 app.Run();

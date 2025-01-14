@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using EmailAnalyzer.Shared.Models.Auth;
+using EmailAnalyzer.Shared.Services;
 using EmailAnalyzer.Server.Services.Email;
 
 namespace EmailAnalyzer.Server.Controllers;
@@ -12,13 +13,16 @@ namespace EmailAnalyzer.Server.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IEmailServiceFactory _emailServiceFactory;
+    private readonly ITokenStorageService _tokenStorageService;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IEmailServiceFactory emailServiceFactory,
+        ITokenStorageService tokenStorageService,
         ILogger<AuthController> logger)
     {
         _emailServiceFactory = emailServiceFactory;
+        _tokenStorageService = tokenStorageService;
         _logger = logger;
     }
     
@@ -51,8 +55,12 @@ public class AuthController : ControllerBase
                 return BadRequest(response);
             }
 
-            // TODO: Store user credentials in database
-
+            await _tokenStorageService.StoreTokenAsync(
+                request.Provider,
+                response.AccessToken!,
+                response.RefreshToken ?? "",
+                response.ExpiresAt
+            );
             return Ok(response);
         }
         catch (Exception ex)
