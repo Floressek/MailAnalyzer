@@ -16,8 +16,8 @@ public class OutlookConfiguration
     public string ClientId { get; set; } = string.Empty;
     public string ClientSecret { get; set; } = string.Empty;
     public string RedirectUri { get; set; } = string.Empty;
-    public string Authority { get; set; } = string.Empty;  // Z TenantId na Authority
-    public string Endpoint { get; set; } = string.Empty;   // Added
+    public string Authority { get; set; } = string.Empty; // Z TenantId na Authority
+    public string Endpoint { get; set; } = string.Empty; // Added
     public string[] Scopes { get; set; } = Array.Empty<string>();
 }
 
@@ -27,8 +27,11 @@ public class OutlookConfiguration
 public class OutlookEmailService : IEmailService
 {
     private readonly OutlookConfiguration _config;
+
     private readonly ILogger<OutlookEmailService> _logger;
+
     private readonly IConfidentialClientApplication _msalClient;
+    // private readonly IPublicClientApplication _msalClient;
     private GraphServiceClient? _graphClient;
 
     /// <summary>
@@ -52,6 +55,11 @@ public class OutlookEmailService : IEmailService
             .WithAuthority(_config.Authority)
             .Build();
 
+        // _msalClient = PublicClientApplicationBuilder
+        //     .Create(_config.ClientId)
+        //     .WithAuthority(_config.Authority)
+        //     .WithRedirectUri(_config.RedirectUri)
+        //     .Build();
         _logger.LogInformation("OutlookEmailService initialized with client ID: {ClientId}", _config.ClientId);
     }
 
@@ -68,6 +76,7 @@ public class OutlookEmailService : IEmailService
                 .WithPrompt(Prompt.SelectAccount)
                 .WithExtraQueryParameters(new Dictionary<string, string> { { "state", "outlook" } })
                 .ExecuteAsync();
+            
 
             _logger.LogInformation("Generated authorization URL: {Url}", url);
             return url.AbsoluteUri; // Return the URL
@@ -107,7 +116,8 @@ public class OutlookEmailService : IEmailService
             {
                 Success = true,
                 AccessToken = result.AccessToken,
-                ExpiresAt = result.ExpiresOn.DateTime
+                ExpiresAt = result.ExpiresOn.DateTime,
+                // RefreshToken = result.RefreshToken
             };
         }
         catch (MsalException ex)
@@ -183,16 +193,16 @@ public class OutlookEmailService : IEmailService
         {
             var accounts = await _msalClient.GetAccountsAsync();
             var account = accounts.FirstOrDefault();
-            
+
             if (account is null)
             {
                 _logger.LogError("No accounts found for token refresh");
                 return false;
             }
-            
+
             var result = await _msalClient.AcquireTokenSilent(_config.Scopes, account)
                 .ExecuteAsync();
-            
+
             var httpClient = new HttpClient();
             httpClient.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Bearer", result.AccessToken);

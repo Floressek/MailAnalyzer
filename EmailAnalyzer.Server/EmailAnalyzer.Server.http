@@ -3,6 +3,9 @@
 #GET {{EmailAnalyzer.Server_HostAddress}}/weatherforecast/
 #Accept: application/json
 
-GET http://localhost:5045/api/auth/url/gmail
+GET http://localhost:5045/api/auth/url/outlook
 Accept: application/json
+
+#GET http://localhost:5045/api/email/gmail?startDate=2024-01-01&endDate=2024-01-14
+#Accept: application/json
 ###
