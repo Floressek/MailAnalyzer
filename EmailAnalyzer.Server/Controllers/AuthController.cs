@@ -31,12 +31,15 @@ public class AuthController : ControllerBase
     {
         try
         {
+            Console.WriteLine($"[AUTH CONTROLLER] Received request for provider: {provider}");
             var service = _emailServiceFactory.GetService(provider);
             var url = await service.GetAutorizationUrlAsync();
+            Console.WriteLine($"[AUTH CONTROLLER] Generated URL: {url}");
             return Ok(new { url });
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[AUTH CONTROLLER] Error: {ex.Message}\n{ex.StackTrace}");
             _logger.LogError(ex, "Error getting auth URL for {Provider}", provider);
             return BadRequest(new { error = "Could not generate auth URL" });
         }

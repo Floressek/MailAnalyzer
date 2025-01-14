@@ -1,47 +1,59 @@
-﻿<?xml version="1.0" encoding="utf-8" ?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="EmailAnalyzer.Client.Pages.LoginPage">
     <Grid RowDefinitions="Auto,*,Auto" Padding="20">
-        <VerticalStackLayout Grid.Row="0" 
-                            Spacing="20"
-                            IsVisible="{Binding IsLoginVisible}">
-            <Label 
+        <VerticalStackLayout Grid.Row="0"
+                             Spacing="20"
+                             x:Name="LoginPanel"
+                             IsVisible="{Binding IsLoginVisible}">
+            <Label
                 Text="Email Analyzer"
                 SemanticProperties.HeadingLevel="Level1"
                 FontSize="32"
                 HorizontalOptions="Center" />
-            
-            <Label 
+
+            <Label
                 Text="Connect your email accounts to start analyzing"
                 FontSize="18"
                 HorizontalOptions="Center" />
-                
-            <Button 
+
+            <Button
                 x:Name="OutlookButton"
                 Text="Connect Outlook"
                 Clicked="OnOutlookClicked"
-                HorizontalOptions="Center"/>
-            
-            <Button 
+                HorizontalOptions="Center" />
+
+            <Button
                 x:Name="GmailButton"
                 Text="Connect Gmail"
                 Clicked="OnGmailClicked"
-                HorizontalOptions="Center"/>
+                HorizontalOptions="Center" />
+
+            <Label
+                x:Name="DebugLabel"
+                Text=""
+                FontSize="12"
+                TextColor="Gray" />
         </VerticalStackLayout>
 
-        <!-- WebView do autoryzacji -->
-        <WebView Grid.Row="0" Grid.RowSpan="3"
-                x:Name="AuthWebView"
-                IsVisible="false"
-                Navigated="AuthWebView_Navigated"/>
+        <Grid Grid.Row="1"
+              x:Name="WebViewContainer"
+              IsVisible="false"
+              BackgroundColor="White"
+              ZIndex="999">
+            <WebView x:Name="AuthWebView"
+                     VerticalOptions="FillAndExpand"
+                     HorizontalOptions="FillAndExpand"
+                     Navigated="AuthWebView_Navigated" />
+        </Grid>
 
-        <ActivityIndicator 
-            Grid.Row="1"
+        <ActivityIndicator
+            Grid.Row="2"
             x:Name="LoadingIndicator"
             IsRunning="False"
             IsVisible="False"
             HorizontalOptions="Center"
-            VerticalOptions="Center"/>
+            VerticalOptions="Center" />
     </Grid>
 </ContentPage>

@@ -4,6 +4,11 @@ using EmailAnalyzer.Shared.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(5045); // Nasłuchuj na wszystkich interfejsach
+});
+
 // Konfiguracja logowania
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
@@ -51,6 +56,14 @@ if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
 }
 
+app.Use(async (context, next) =>
+{
+    Console.WriteLine($"[REQUEST] {context.Request.Method} {context.Request.Path} from {context.Connection.RemoteIpAddress}");
+    await next();
+    Console.WriteLine($"[RESPONSE] {context.Response.StatusCode}");
+});
+
+
 // Dodaj middleware w odpowiedniej kolejności
 app.UseCors("AllowAll");
 app.UseHttpsRedirection();
@@ -66,4 +79,10 @@ app.MapControllerRoute(
 
 app.MapControllers();
 
+app.Use(async (context, next) =>
+{
+    Console.WriteLine($"[MIDDLEWARE] Request: {context.Request.Method} {context.Request.Path}");
+    await next();
+    Console.WriteLine($"[MIDDLEWARE] Response: {context.Response.StatusCode}");
+});
 app.Run();

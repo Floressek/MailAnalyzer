@@ -7,24 +7,31 @@ namespace EmailAnalyzer.Client;
 
 public static class MauiProgram
 {
-	public static MauiApp CreateMauiApp()
-	{
-		var builder = MauiApp.CreateBuilder();
-		builder
-			.UseMauiApp<App>()
-			.ConfigureFonts(fonts =>
-			{
-				fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-				fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
-			});
-		
-		builder.Services.AddSingleton<ITokenStorageService, SecureTokenStorageService>();
-		builder.Services.AddTransient<LoginPage>();
+    public static MauiApp CreateMauiApp()
+    {
+        Console.WriteLine("Creating MAUI app...");
+
+        var builder = MauiApp.CreateBuilder();
+        builder
+            .UseMauiApp<App>()
+            .ConfigureFonts(fonts =>
+            {
+                fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
+                fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+            });
+
+        Console.WriteLine("Registering services...");
+
+        builder.Services.AddSingleton<ITokenStorageService, SecureTokenStorageService>();
+        builder.Services.AddSingleton<AppShell>(); // Dodaj to
+        builder.Services.AddTransient<LoginPage>();
 
 #if DEBUG
-		builder.Logging.AddDebug();
+        builder.Logging.AddDebug();
+        builder.Logging.SetMinimumLevel(LogLevel.Trace);
+        builder.Logging.ClearProviders();
 #endif
 
-		return builder.Build();
-	}
+        return builder.Build();
+    }
 }

@@ -4,20 +4,19 @@ using EmailAnalyzer.Shared.Services;
 using Microsoft.Extensions.Logging;
 
 namespace EmailAnalyzer.Client.Pages;
-
 public partial class LoginPage : ContentPage
 {
-    private class AuthUrlResponse // Used to deserialize the response from the API
+    private class AuthUrlResponse
     {
         public string? Url { get; set; }
     }
     
     private readonly ITokenStorageService _tokenStorage;
-    private readonly HttpClient _httpClient;
     private readonly ILogger<LoginPage> _logger;
+    private readonly HttpClient _httpClient;
     private string _currentProvider = string.Empty;
     
-    public bool IsLoginVisible { get; set; } = true;  // Add this property
+    public bool IsLoginVisible { get; set; } = true;
 
     public LoginPage(
         ITokenStorageService tokenStorage,
@@ -26,14 +25,45 @@ public partial class LoginPage : ContentPage
         InitializeComponent();
         _tokenStorage = tokenStorage;
         _logger = logger;
-        // _httpClient = new HttpClient { BaseAddress = new Uri("http://localhost:5045/") };
-        _httpClient = new HttpClient { BaseAddress = new Uri("http://10.0.2.2:5045/") }; // dla emulatora
-        BindingContext = this; // Add this for the IsLoginVisible property
+        _httpClient = new HttpClient { BaseAddress = new Uri("http://192.168.1.78:5045/") };
+        BindingContext = this;
+    }
+    
+    private void LogDebugInfo(string message)
+    {
+        MainThread.BeginInvokeOnMainThread(() =>
+        {
+            DebugLabel.Text = $"[{DateTime.Now:HH:mm:ss}] {message}";
+        });
     }
 
     private async void OnOutlookClicked(object sender, EventArgs e)
     {
-        await StartAuth("outlook");
+        try
+        {
+            _logger.LogInformation("Testing server connection...");
+            var response = await _httpClient.GetAsync("api/health");
+            
+            if (response.IsSuccessStatusCode)
+            {
+                _logger.LogInformation("Server connection successful");
+                await StartAuth("outlook");
+            }
+            else
+            {
+                _logger.LogError($"Server returned: {response.StatusCode}");
+                await DisplayAlert("Error", 
+                    $"Server connection failed with status: {response.StatusCode}", 
+                    "OK");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Connection test failed");
+            await DisplayAlert("Connection Error", 
+                $"Could not connect to server: {ex.Message}", 
+                "OK");
+        }
     }
 
     private async void OnGmailClicked(object sender, EventArgs e)
@@ -47,37 +77,41 @@ public partial class LoginPage : ContentPage
         {
             LoadingIndicator.IsVisible = true;
             _currentProvider = provider;
+            LogDebugInfo($"Starting auth for {provider}");
 
-            _logger.LogInformation($"Starting auth for {provider} with base address: {_httpClient.BaseAddress}");
             var response = await _httpClient.GetAsync($"api/auth/url/{provider}");
             var content = await response.Content.ReadAsStringAsync();
-            _logger.LogInformation($"Response status: {response.StatusCode}");
-            _logger.LogInformation($"Response content: {content}");
+            LogDebugInfo($"Got response: {content}");
 
             if (!response.IsSuccessStatusCode)
             {
-                var error = $"Failed to start authentication: {response.StatusCode} - {content}";
-                _logger.LogError(error);
-                await DisplayAlert("Error", error, "OK");
+                LogDebugInfo($"Error: {response.StatusCode}");
+                await DisplayAlert("Error", 
+                    $"Authentication failed: {response.StatusCode}", 
+                    "OK");
                 return;
             }
 
             var result = await response.Content.ReadFromJsonAsync<AuthUrlResponse>();
-            _logger.LogInformation($"Received auth URL: {result?.Url}");
-        
             if (result?.Url == null)
             {
+                LogDebugInfo("No URL in response");
                 await DisplayAlert("Error", "Invalid authentication URL", "OK");
                 return;
             }
 
+            LogDebugInfo("Opening WebView...");
             AuthWebView.IsVisible = true;
+            WebViewContainer.IsVisible = true;
+            await Task.Delay(100); // Daj czas na update UI
+            
+            LogDebugInfo($"Loading URL: {result.Url}");
             AuthWebView.Source = result.Url;
-            _logger.LogInformation($"Loading URL in WebView: {result.Url}");
+            LogDebugInfo($"WebView loaded with URL");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during authentication");
+            _logger.LogError(ex, "Authentication failed");
             await DisplayAlert("Error", $"Authentication failed: {ex.Message}", "OK");
         }
         finally
@@ -90,66 +124,66 @@ public partial class LoginPage : ContentPage
     {
         try
         {
-            // Sprawdź czy to callback URL
-            if (e.Url.StartsWith("http://10.0.2.2:5045/auth/callback"))
+            LogDebugInfo($"WebView navigated to: {e.Url}");
+            if (e.Url.StartsWith($"{_httpClient.BaseAddress}auth/callback"))
             {
                 var uri = new Uri(e.Url);
                 var code = System.Web.HttpUtility.ParseQueryString(uri.Query).Get("code");
                 var state = System.Web.HttpUtility.ParseQueryString(uri.Query).Get("state");
 
-                if (!string.IsNullOrEmpty(code))
+                if (string.IsNullOrEmpty(code))
                 {
-                    // Wyślij kod do API
-                    var authRequest = new AuthRequest
-                    {
-                        Provider = _currentProvider,
-                        AuthCode = code
-                    };
+                    await DisplayAlert("Error", "Authentication failed - no code received", "OK");
+                    AuthWebView.IsVisible = false;
+                    return;
+                }
 
-                    var response = await _httpClient.PostAsJsonAsync("api/auth/authenticate", authRequest);
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
-                        if (authResponse?.Success == true)
-                        {
-                            // Zapisz token
-                            await _tokenStorage.StoreTokenAsync(
-                                _currentProvider,
-                                authResponse.AccessToken!,
-                                authResponse.RefreshToken ?? "",
-                                authResponse.ExpiresAt
-                            );
+                var authRequest = new AuthRequest
+                {
+                    Provider = _currentProvider,
+                    AuthCode = code
+                };
 
-                            // Ukryj WebView i pokaż sukces
-                            AuthWebView.IsVisible = false;
-                            await DisplayAlert("Success", "Successfully connected!", "OK");
-                            
-                            // TODO: Navigate to next page
-                        }
+                var response = await _httpClient.PostAsJsonAsync("api/auth/authenticate", authRequest);
+                if (response.IsSuccessStatusCode)
+                {
+                    var authResponse = await response.Content.ReadFromJsonAsync<AuthResponse>();
+                    if (authResponse?.Success == true)
+                    {
+                        await _tokenStorage.StoreTokenAsync(
+                            _currentProvider,
+                            authResponse.AccessToken!,
+                            authResponse.RefreshToken ?? "",
+                            authResponse.ExpiresAt
+                        );
+
+                        AuthWebView.IsVisible = false;
+                        await DisplayAlert("Success", "Successfully connected!", "OK");
                     }
                 }
                 else
                 {
-                    await DisplayAlert("Error", "Authentication failed", "OK");
+                    var error = await response.Content.ReadAsStringAsync();
+                    await DisplayAlert("Error", $"Authentication failed: {error}", "OK");
                 }
                 
-                // Wróć do widoku logowania
                 AuthWebView.IsVisible = false;
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing authentication callback");
-            await DisplayAlert("Error", "Failed to complete authentication", "OK");
+            _logger.LogError(ex, "Callback processing failed");
+            await DisplayAlert("Error", $"Authentication callback failed: {ex.Message}", "OK");
             AuthWebView.IsVisible = false;
         }
     }
+    
+
 
     protected override async void OnNavigatedTo(NavigatedToEventArgs args)
     {
         base.OnNavigatedTo(args);
 
-        // Sprawdź czy mamy już tokeny
         var (outlookToken, _, outlookExpiry) = await _tokenStorage.GetTokenAsync("outlook");
         var (gmailToken, _, gmailExpiry) = await _tokenStorage.GetTokenAsync("gmail");
 
