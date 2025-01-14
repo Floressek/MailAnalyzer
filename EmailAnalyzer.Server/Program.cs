@@ -1,41 +1,60 @@
+using EmailAnalyzer.Server.Services.Email;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// Konfiguracja logowania
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
+
+// Konfiguracja email services
+builder.Services.Configure<OutlookConfiguration>(
+    builder.Configuration.GetSection("Outlook"));
+builder.Services.Configure<GmailConfiguration>(
+    builder.Configuration.GetSection("Gmail"));
+
+// Rejestracja obu serwisów email
+builder.Services.AddScoped<OutlookEmailService>();
+builder.Services.AddScoped<GmailEmailService>();
+
+// Rejestracja factory dla serwisów email
+builder.Services.AddScoped<IEmailServiceFactory>(sp =>
+{
+    return new EmailServiceFactory(
+        outlook: sp.GetRequiredService<OutlookEmailService>(),
+        gmail: sp.GetRequiredService<GmailEmailService>()
+    );
+});
+
+// Dodaj CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", builder =>
+    {
+        builder.AllowAnyOrigin()
+            .AllowAnyMethod()
+            .AllowAnyHeader();
+    });
+});
+
+builder.Services.AddControllers();
 
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    app.UseDeveloperExceptionPage();
 }
 
+app.MapControllerRoute( // Added auth-callback route
+    name: "auth-callback",
+    pattern: "auth/callback",
+    defaults: new { controller = "Auth", action = "Callback" }
+);
+
+app.UseCors("AllowAll");
 app.UseHttpsRedirection();
-
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast =  Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast");
+app.UseAuthorization();
+app.MapControllers();
 
 app.Run();
-
-record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}
