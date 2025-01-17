@@ -9,8 +9,10 @@ if (!builder.Environment.IsDevelopment())
 {
     builder.WebHost.ConfigureKestrel(serverOptions =>
     {
+        // Railway injects PORT environment variable
         var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
         serverOptions.ListenAnyIP(int.Parse(port));
+        Console.WriteLine($"[STARTUP] Configuring server to listen on port {port}");
     });
 }
 
@@ -45,9 +47,12 @@ builder.Services.AddSingleton<ITokenStorageService, ServerTokenStorageService>()
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", builder =>
-        builder.AllowAnyOrigin()
-               .AllowAnyMethod()
-               .AllowAnyHeader());
+    {
+        builder.SetIsOriginAllowed(_ => true) // FIXME: PRODUCTION DELETE
+            .AllowAnyMethod()
+            .AllowAnyHeader()
+            .AllowCredentials();
+    });
 });
 
 builder.Services.AddControllers();
