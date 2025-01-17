@@ -62,12 +62,22 @@ builder.Services.AddControllers();
 var app = builder.Build();
 
 // Development specific middleware
+// if (app.Environment.IsDevelopment())
+// {
+//     app.UseDeveloperExceptionPage();
+//     app.UseSwagger();
+//     app.UseSwaggerUI();
+// }
+
+// Development specific middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
-    app.UseSwagger();
-    app.UseSwaggerUI();
 }
+
+// Swagger UI dostępny również w produkcji
+app.UseSwagger();
+app.UseSwaggerUI();
 
 // Request logging middleware
 app.Use(async (context, next) =>
