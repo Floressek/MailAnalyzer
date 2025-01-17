@@ -4,9 +4,10 @@ using EmailAnalyzer.Shared.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.ConfigureKestrel(options =>
+builder.WebHost.ConfigureKestrel(serverOptions =>
 {
-    options.ListenAnyIP(5045); // Nasłuchuj na wszystkich interfejsach
+    var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+    serverOptions.ListenAnyIP(int.Parse(port));
 });
 
 // Konfiguracja logowania

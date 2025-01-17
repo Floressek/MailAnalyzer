@@ -1,59 +1,145 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
-             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
-             x:Class="EmailAnalyzer.Client.Pages.LoginPage">
-    <Grid RowDefinitions="Auto,*,Auto" Padding="20">
-        <VerticalStackLayout Grid.Row="0"
-                             Spacing="20"
-                             x:Name="LoginPanel"
-                             IsVisible="{Binding IsLoginVisible}">
-            <Label
-                Text="Email Analyzer"
-                SemanticProperties.HeadingLevel="Level1"
-                FontSize="32"
-                HorizontalOptions="Center" />
+<ContentPage
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    x:Class="EmailAnalyzer.Client.Pages.LoginPage"
+    Title="Email Analyzer">
 
-            <Label
+    <!-- Page Resources for styling -->
+    <ContentPage.Resources>
+        <!-- Example color palette -->
+        <Color x:Key="PrimaryColor">#6200EE</Color>
+        <Color x:Key="SecondaryColor">#03DAC5</Color>
+        <Color x:Key="TextColorDark">#333333</Color>
+        <Color x:Key="OverlayColor">#80000000</Color>
+        
+        <!-- Heading label style -->
+        <Style x:Key="HeaderLabelStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="32"/>
+            <Setter Property="FontAttributes" Value="Bold"/>
+            <Setter Property="HorizontalOptions" Value="Center"/>
+            <Setter Property="TextColor" Value="{StaticResource PrimaryColor}"/>
+            <Setter Property="Margin" Value="0,20,0,10"/>
+        </Style>
+
+        <!-- Subheading label style -->
+        <Style x:Key="SubHeaderLabelStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="HorizontalOptions" Value="Center"/>
+            <Setter Property="TextColor" Value="{StaticResource TextColorDark}"/>
+            <Setter Property="Margin" Value="0,0,0,15"/>
+        </Style>
+
+        <!-- General button style -->
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="TextColor" Value="White"/>
+            <Setter Property="BackgroundColor" Value="{StaticResource PrimaryColor}"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="HorizontalOptions" Value="Center"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="Margin" Value="0,5"/>
+        </Style>
+
+        <!-- Debug / status label style -->
+        <Style x:Key="DebugLabelStyle" TargetType="Label">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="TextColor" Value="Gray"/>
+            <Setter Property="HorizontalOptions" Value="Center"/>
+            <Setter Property="Margin" Value="0,10,0,0"/>
+        </Style>
+    </ContentPage.Resources>
+
+    <Grid Padding="20" BackgroundColor="White">
+        <!-- Define rows:
+             1) Auto: for the upper content
+             2) *:   for spacing, if needed
+        -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- 
+            This is your main login panel that shows “Connect Outlook/Gmail” 
+            and a debug label. 
+        -->
+        <VerticalStackLayout
+            x:Name="LoginPanel"
+            Grid.Row="0"
+            Spacing="10"
+            IsVisible="{Binding IsLoginVisible}">
+            
+            <Label 
+                Text="Email Analyzer"
+                Style="{StaticResource HeaderLabelStyle}"/>
+            
+            <Label 
                 Text="Connect your email accounts to start analyzing"
-                FontSize="18"
-                HorizontalOptions="Center" />
+                Style="{StaticResource SubHeaderLabelStyle}"/>
 
             <Button
                 x:Name="OutlookButton"
                 Text="Connect Outlook"
-                Clicked="OnOutlookClicked"
-                HorizontalOptions="Center" />
-
+                Style="{StaticResource PrimaryButtonStyle}"
+                Clicked="OnOutlookClicked"/>
+            
             <Button
                 x:Name="GmailButton"
                 Text="Connect Gmail"
-                Clicked="OnGmailClicked"
-                HorizontalOptions="Center" />
+                Style="{StaticResource PrimaryButtonStyle}"
+                Clicked="OnGmailClicked"/>
 
+            <!-- Debug Label for logging status messages -->
             <Label
                 x:Name="DebugLabel"
                 Text=""
-                FontSize="12"
-                TextColor="Gray" />
+                Style="{StaticResource DebugLabelStyle}"/>
         </VerticalStackLayout>
 
-        <Grid Grid.Row="1"
-              x:Name="WebViewContainer"
-              IsVisible="false"
-              BackgroundColor="White"
-              ZIndex="999">
-            <WebView x:Name="AuthWebView"
-                     VerticalOptions="FillAndExpand"
-                     HorizontalOptions="FillAndExpand"
-                     Navigated="AuthWebView_Navigated" />
-        </Grid>
+        <!-- 
+            Overlay that will appear on top of everything 
+            when the user is navigating in the WebView. 
+        -->
+        <Grid
+            x:Name="WebViewOverlay"
+            IsVisible="false"
+            Grid.RowSpan="2" 
+            BackgroundColor="{StaticResource OverlayColor}"
+            VerticalOptions="FillAndExpand" 
+            HorizontalOptions="FillAndExpand"
+            ZIndex="10">
 
-        <ActivityIndicator
-            Grid.Row="2"
-            x:Name="LoadingIndicator"
-            IsRunning="False"
-            IsVisible="False"
-            HorizontalOptions="Center"
-            VerticalOptions="Center" />
+            <!-- We can center a card-like Frame containing the WebView -->
+            <Frame
+                HasShadow="True"
+                CornerRadius="12"
+                BackgroundColor="White"
+                VerticalOptions="Center"
+                HorizontalOptions="Center"
+                HeightRequest="500"
+                WidthRequest="350"
+                Padding="0">
+
+                <Grid>
+                    <WebView
+                        x:Name="AuthWebView"
+                        Navigated="AuthWebView_Navigated"
+                        VerticalOptions="FillAndExpand"
+                        HorizontalOptions="FillAndExpand"/>
+                    
+                    <!-- Optional Activity Indicator 
+                         (the user may see both the "LoadingIndicator" 
+                          and this indicator if you want.) -->
+                    <ActivityIndicator
+                        x:Name="LoadingIndicator"
+                        IsRunning="False"
+                        IsVisible="False"
+                        VerticalOptions="Center"
+                        HorizontalOptions="Center"
+                        Color="{StaticResource PrimaryColor}"/>
+                </Grid>
+            </Frame>
+        </Grid>
     </Grid>
 </ContentPage>
