@@ -24,13 +24,15 @@ public class GmailEmailService : IEmailService
     private readonly GmailConfiguration _config;
     private readonly ILogger<GmailEmailService> _logger;
     private GmailService? _gmailService;
+    private ServerTokenStorageService _tokenStorageService;
 
     public GmailEmailService(
         IOptions<GmailConfiguration> config,
-        ILogger<GmailEmailService> logger)
+        ILogger<GmailEmailService> logger, ServerTokenStorageService tokenStorageService)
     {
         _config = config.Value;
         _logger = logger;
+        _tokenStorageService = tokenStorageService;
 
         _logger.LogInformation("GmailEmailService initialized with client ID: {ClientId}",
             _config.ClientId);
@@ -127,6 +129,21 @@ public class GmailEmailService : IEmailService
 
     public async Task<List<EmailMessage>> GetEmailsByDateAsync(DateTime startDate, DateTime endDate)
     {
+        // Download auth token from saved file
+        var (accessToken, refreshToken, expiresAt) = await _tokenStorageService.GetTokenAsync("gmail");
+        if (string.IsNullOrEmpty(accessToken) || expiresAt <= DateTime.UtcNow)
+        {
+            _logger.LogWarning("Gmail token not found or expired. Please authenticate first.");
+            return new List<EmailMessage>();
+        }
+        
+        var credentials = GoogleCredential.FromAccessToken(accessToken); // Initialize Gmail service if not set
+        _gmailService = new GmailService(new BaseClientService.Initializer
+        {
+            HttpClientInitializer = credentials,
+            ApplicationName = "EmailAnalyzer"
+        });
+        
         if (_gmailService == null)
         {
             _logger.LogWarning("Gmail service not initialized. Authentication required.");

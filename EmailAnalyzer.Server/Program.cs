@@ -41,7 +41,9 @@ builder.Services.AddScoped<IEmailServiceFactory>(sp =>
     ));
 
 // Token storage service
+builder.Services.AddSingleton<ServerTokenStorageService>();
 builder.Services.AddSingleton<ITokenStorageService, ServerTokenStorageService>();
+
 
 // CORS configuration
 builder.Services.AddCors(options =>
