@@ -26,19 +26,18 @@ public partial class LoginPage : ContentPage
         InitializeComponent();
         _tokenStorage = tokenStorage;
         _logger = logger;
-        
-        // Adjust BaseAddress if needed
-        _httpClient = new HttpClient { BaseAddress = new Uri("http://192.168.1.78:5045/") };
 
+        // Adjust BaseAddress if needed
+        _httpClient = new HttpClient
+        {
+            BaseAddress = new Uri("https://mailanalyzer-production.up.railway.app/")
+        };
         BindingContext = this;
     }
 
     private void LogDebugInfo(string message)
     {
-        MainThread.BeginInvokeOnMainThread(() =>
-        {
-            DebugLabel.Text = $"[{DateTime.Now:HH:mm:ss}] {message}";
-        });
+        MainThread.BeginInvokeOnMainThread(() => { DebugLabel.Text = $"[{DateTime.Now:HH:mm:ss}] {message}"; });
     }
 
     private async void OnOutlookClicked(object sender, EventArgs e)
@@ -102,70 +101,59 @@ public partial class LoginPage : ContentPage
     }
 
     private async Task StartAuth(string provider)
-{
-    try
     {
-        LoadingIndicator.IsVisible = true;
-        _currentProvider = provider;
-
-        LogDebugInfo($"Starting auth for {provider}");
-        
-        var response = await _httpClient.GetAsync($"api/auth/url/{provider}");
-        var content = await response.Content.ReadAsStringAsync();
-        
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            LogDebugInfo($"Error: {response.StatusCode}");
-            await DisplayAlert("Error",
-                $"Authentication failed: {response.StatusCode}",
-                "OK");
-            return;
-        }
+            LoadingIndicator.IsVisible = true;
+            _currentProvider = provider;
 
-        var result = await response.Content.ReadFromJsonAsync<AuthUrlResponse>();
-        if (result?.Url == null)
-        {
-            LogDebugInfo("No URL in response");
-            await DisplayAlert("Error", "Invalid authentication URL", "OK");
-            return;
-        }
+            LogDebugInfo($"Starting auth for {provider}");
 
-        // Użyj Browser.OpenAsync zamiast WebView dla Google
-        if (provider == "gmail")
-        {
-            // try
-            // {
-            //     await Browser.OpenAsync(result.Url, BrowserLaunchMode.SystemPreferred);
-            // }
-            try 
+            var response = await _httpClient.GetAsync($"api/auth/url/{provider}");
+            if (!response.IsSuccessStatusCode)
             {
-                var uri = new Uri(result.Url);
-                await Browser.OpenAsync(uri, BrowserLaunchMode.SystemPreferred);
+                LogDebugInfo($"Error: {response.StatusCode}");
+                await DisplayAlert("Error",
+                    $"Authentication failed: {response.StatusCode}",
+                    "OK");
+                return;
+            }
+
+            var result = await response.Content.ReadFromJsonAsync<AuthUrlResponse>();
+            if (result?.Url == null)
+            {
+                LogDebugInfo("No URL in response");
+                await DisplayAlert("Error", "Invalid authentication URL", "OK");
+                return;
+            }
+
+            LogDebugInfo($"Opening URL: {result.Url}");
+
+            try
+            {
+                await Browser.Default.OpenAsync(result.Url,
+                    BrowserLaunchMode.SystemPreferred);
             }
             catch (Exception ex)
             {
-                LogDebugInfo($"Failed to open browser: {ex.Message}");
-                await DisplayAlert("Error", "Could not open browser for authentication", "OK");
+                LogDebugInfo($"Browser error: {ex.Message}");
+                await DisplayAlert("Error",
+                    "Could not open browser for authentication",
+                    "OK");
             }
         }
-        else 
+        catch (Exception ex)
         {
-            // Dla innych providerów (np. Outlook) możemy nadal używać WebView
-            WebViewOverlay.IsVisible = true;
-            await Task.Delay(100);
-            AuthWebView.Source = result.Url;
+            _logger.LogError(ex, "Authentication failed");
+            await DisplayAlert("Error",
+                $"Authentication failed: {ex.Message}",
+                "OK");
+        }
+        finally
+        {
+            LoadingIndicator.IsVisible = false;
         }
     }
-    catch (Exception ex)
-    {
-        _logger.LogError(ex, "Authentication failed");
-        await DisplayAlert("Error", $"Authentication failed: {ex.Message}", "OK");
-    }
-    finally
-    {
-        LoadingIndicator.IsVisible = false;
-    }
-}
 
     private async void AuthWebView_Navigated(object sender, WebNavigatedEventArgs e)
     {
@@ -212,7 +200,7 @@ public partial class LoginPage : ContentPage
                     var error = await response.Content.ReadAsStringAsync();
                     await DisplayAlert("Error", $"Authentication failed: {error}", "OK");
                 }
-                
+
                 WebViewOverlay.IsVisible = false;
             }
         }
@@ -223,7 +211,7 @@ public partial class LoginPage : ContentPage
             WebViewOverlay.IsVisible = false;
         }
     }
-    
+
     public async Task HandleAuthCallback(string code, string state)
     {
         if (string.IsNullOrEmpty(code))

@@ -21,11 +21,12 @@ public class SecureTokenStorageService : ITokenStorageService
             var credentials = new UserCredentials
             {
                 Provider = provider,
+                AccessToken = accessToken,  // Dodaj też AccessToken
                 RefreshToken = refreshToken,
                 TokenExpiry = expiresAt
             };
             
-            var json = JsonSerializer.Serialize(credentials); // Changed from JsonConvert
+            var json = JsonSerializer.Serialize(credentials);
             await SecureStorage.Default.SetAsync($"token_{provider}", json);
             
             _logger.LogInformation("Token stored for {Provider}", provider);
@@ -48,21 +49,13 @@ public class SecureTokenStorageService : ITokenStorageService
                 return (null, null, DateTime.MinValue);
             }
 
-        
-            // var tokenData = JsonSerializer.Deserialize<dynamic>(json); // Changed from JsonConvert
-            // return (
-            //     tokenData.AccessToken.ToString(),
-            //     tokenData.RefreshToken.ToString(),
-            //     DateTime.Parse(tokenData.ExpiresAt.ToString())
-            // );
-            
             var credentials = JsonSerializer.Deserialize<UserCredentials>(json);
             if (credentials == null)
             {
                 return (null, null, DateTime.MinValue);
             }
 
-            return (null, credentials.RefreshToken, credentials.TokenExpiry);
+            return (credentials.AccessToken, credentials.RefreshToken, credentials.TokenExpiry);  // Zwróć też AccessToken
         }
         catch (Exception ex)
         {
@@ -77,6 +70,7 @@ public class SecureTokenStorageService : ITokenStorageService
         {
             SecureStorage.Default.Remove($"token_{provider}");
             _logger.LogInformation("Tokens removed for {Provider}", provider);
+            await Task.CompletedTask;  // Dodaj to, żeby metoda była rzeczywiście asynchroniczna
         }
         catch (Exception ex)
         {
