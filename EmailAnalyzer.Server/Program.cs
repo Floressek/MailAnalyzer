@@ -4,74 +4,83 @@ using EmailAnalyzer.Shared.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.ConfigureKestrel(serverOptions =>
+// Keep the Kestrel configuration for production (Railway)
+if (!builder.Environment.IsDevelopment())
 {
-    var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-    serverOptions.ListenAnyIP(int.Parse(port));
-});
+    builder.WebHost.ConfigureKestrel(serverOptions =>
+    {
+        var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+        serverOptions.ListenAnyIP(int.Parse(port));
+    });
+}
 
-// Konfiguracja logowania
+// Add Swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+// Logging configuration
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
-// Konfiguracja email services
+// Email service configuration
 builder.Services.Configure<OutlookConfiguration>(
     builder.Configuration.GetSection("Outlook"));
 builder.Services.Configure<GmailConfiguration>(
     builder.Configuration.GetSection("Gmail"));
 
-// Rejestracja serwisów email
+// Email service registration
 builder.Services.AddScoped<OutlookEmailService>();
 builder.Services.AddScoped<GmailEmailService>();
-
-// Rejestracja factory dla serwisów email
 builder.Services.AddScoped<IEmailServiceFactory>(sp =>
-{
-    return new EmailServiceFactory(
+    new EmailServiceFactory(
         outlook: sp.GetRequiredService<OutlookEmailService>(),
         gmail: sp.GetRequiredService<GmailEmailService>()
-    );
-});
+    ));
 
-// Rejestracja TokenStorageService dla serwera
+// Token storage service
 builder.Services.AddSingleton<ITokenStorageService, ServerTokenStorageService>();
 
-// Dodaj CORS
+// CORS configuration
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", builder =>
-    {
         builder.AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
-    });
+               .AllowAnyMethod()
+               .AllowAnyHeader());
 });
 
 builder.Services.AddControllers();
 
 var app = builder.Build();
 
+// Development specific middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
+    app.UseSwagger();
+    app.UseSwaggerUI();
 }
 
+// Request logging middleware
 app.Use(async (context, next) =>
 {
-    Console.WriteLine($"[REQUEST] {context.Request.Method} {context.Request.Path} from {context.Connection.RemoteIpAddress}");
+    Console.WriteLine($"[REQUEST] {context.Request.Method} {context.Request.Path}");
     await next();
     Console.WriteLine($"[RESPONSE] {context.Response.StatusCode}");
 });
 
-
-// Dodaj middleware w odpowiedniej kolejności
 app.UseCors("AllowAll");
-app.UseHttpsRedirection();
+
+// Only use HTTPS redirection in production
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseRouting();
 app.UseAuthorization();
 
-// Konfiguracja routingu
 app.MapControllerRoute(
     name: "auth-callback",
     pattern: "auth/callback",
@@ -80,10 +89,4 @@ app.MapControllerRoute(
 
 app.MapControllers();
 
-app.Use(async (context, next) =>
-{
-    Console.WriteLine($"[MIDDLEWARE] Request: {context.Request.Method} {context.Request.Path}");
-    await next();
-    Console.WriteLine($"[MIDDLEWARE] Response: {context.Response.StatusCode}");
-});
 app.Run();
