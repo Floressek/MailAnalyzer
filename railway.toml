@@ -1,0 +1,3 @@
+﻿[build]
+builder = "dockerfile"
+buildCommand = "docker build -t app ."
