@@ -20,7 +20,7 @@ public class ServerTokenStorageService : ITokenStorageService
         EnsureStoragePathExists();
         LoadTokens();
     }
-    
+
     private void EnsureStoragePathExists()
     {
         try
@@ -42,7 +42,10 @@ public class ServerTokenStorageService : ITokenStorageService
                 var json = File.ReadAllText(_storageFilePath);
                 _logger.LogInformation("Loaded JSON from file: {Json}", json);
 
-                var tokens = JsonSerializer.Deserialize<Dictionary<string, TokenData>>(json);
+                var tokens = JsonSerializer.Deserialize<Dictionary<string, TokenData>>(json, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
 
                 if (tokens != null)
                 {
@@ -99,8 +102,6 @@ public class ServerTokenStorageService : ITokenStorageService
     }
 
 
-
-
     public Task<(string? accessToken, string? refreshToken, DateTime expiresAt)> GetTokenAsync(string provider)
     {
         if (_tokens.TryGetValue(provider, out var token))
@@ -109,7 +110,8 @@ public class ServerTokenStorageService : ITokenStorageService
                 "Retrieved token for {Provider}: AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
                 provider, token.AccessToken, token.RefreshToken, token.ExpiresAt);
 
-            return Task.FromResult<(string?, string?, DateTime)>((token.AccessToken, token.RefreshToken, token.ExpiresAt));
+            return Task.FromResult<(string?, string?, DateTime)>((token.AccessToken, token.RefreshToken,
+                token.ExpiresAt));
         }
 
         _logger.LogWarning("Token not found for {Provider}", provider);
@@ -130,11 +132,11 @@ public class ServerTokenStorageService : ITokenStorageService
 
         foreach (var (key, value) in _tokens)
         {
-            _logger.LogDebug("Token in _tokens: Provider={Provider}, AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
+            _logger.LogDebug(
+                "Token in _tokens: Provider={Provider}, AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
                 key, value.AccessToken, value.RefreshToken, value.ExpiresAt);
         }
 
         return _tokens.ToDictionary(entry => entry.Key, entry => entry.Value);
     }
-
 }
