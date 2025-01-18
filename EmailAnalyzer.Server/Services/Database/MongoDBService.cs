@@ -262,76 +262,10 @@ public class MongoDBService
         }
     }
 
-    // public async Task<List<EmailDocument>> FindSimilarEmailsAsync(
-    //     List<float> queryEmbedding,
-    //     string provider,
-    //     DateTime? startDate = null,
-    //     DateTime? endDate = null,
-    //     int limit = 5)
-    // {
-    //     try
-    //     {
-    //         var filterBuilder = Builders<EmailDocument>.Filter;
-    //         var filters = new List<FilterDefinition<EmailDocument>>
-    //         {
-    //             filterBuilder.Eq(e => e.Provider, provider)
-    //         };
-    //
-    //         if (startDate.HasValue)
-    //             filters.Add(filterBuilder.Gte(e => e.ReceivedDate, startDate.Value));
-    //         if (endDate.HasValue)
-    //             filters.Add(filterBuilder.Lte(e => e.ReceivedDate, endDate.Value));
-    //
-    //         var filter = filterBuilder.And(filters);
-    //
-    //         // Find similar emails
-    //         var vector = BsonValue.Create(queryEmbedding);
-    //
-    //         // Dodaj operację wyszukiwania wektorowego
-    //         // Możemy użyć $vectorSearch jeśli mamy Atlas z obsługą wektorów
-    //         var pipeline = new[]
-    //         {
-    //             // Filter out documents with null or missing embedding
-    //             new BsonDocument("$match", new BsonDocument("embedding", new BsonDocument("$ne", BsonNull.Value))),
-    //
-    //             // Compute similarity
-    //             new BsonDocument("$addFields", new BsonDocument
-    //             {
-    //                 {
-    //                     "similarity", new BsonDocument("$function", new BsonDocument
-    //                     {
-    //                         {
-    //                             "body",
-    //                             "function(v1, v2) { return v1.reduce((acc, val, i) => acc + val * v2[i], 0) / (Math.sqrt(v1.reduce((acc, val) => acc + val * val, 0)) * Math.sqrt(v2.reduce((acc, val) => acc + val * val, 0))); }"
-    //                         },
-    //                         { "args", new BsonArray { "$embedding", new BsonArray(queryEmbedding) } },
-    //                         { "lang", "js" }
-    //                     })
-    //                 }
-    //             }),
-    //
-    //             // Sort by similarity
-    //             new BsonDocument("$sort", new BsonDocument("similarity", -1)),
-    //
-    //             // Limit results
-    //             new BsonDocument("$limit", limit)
-    //         };
-    //
-    //         var results = await _emails.Aggregate<EmailDocument>(pipeline).ToListAsync();
-    //         _logger.LogInformation("Found {Count} similar emails", results.Count);
-    //         return results;
-    //     }
-    //     catch (Exception ex)
-    //     {
-    //         _logger.LogError(ex, "Failed to find similar emails");
-    //         throw;
-    //     }
-    // }
-
     public async Task<List<EmailDocument>> FindSimilarEmailsAsync(
         List<float> queryEmbedding,
         string provider,
-        string query,  // Dodany parametr query
+        string query, // Dodany parametr query
         DateTime? startDate = null,
         DateTime? endDate = null,
         int limit = 5)
@@ -391,110 +325,45 @@ public class MongoDBService
 
             var pipeline = new[]
             {
-                // Podstawowy match na podstawie filtrów (provider, daty itp.)
                 new BsonDocument("$match", filter.Render(
                     _emails.DocumentSerializer,
                     _emails.Settings.SerializerRegistry)),
 
-                // Obliczamy vector similarity
+                // Obliczamy tylko dot product bez żadnej normalizacji
                 new BsonDocument("$addFields", new BsonDocument
                 {
                     {
-                        "similarity", new BsonDocument("$ifNull", new BsonArray
+                        "similarity", new BsonDocument("$reduce", new BsonDocument
                         {
-                            new BsonDocument("$let", new BsonDocument
+                            { "input", new BsonDocument("$range", new BsonArray { 0, queryEmbedding.Count }) },
+                            { "initialValue", 0.0 },
                             {
+                                "in", new BsonDocument("$add", new BsonArray
                                 {
-                                    "vars", new BsonDocument
+                                    "$$value",
+                                    new BsonDocument("$multiply", new BsonArray
                                     {
-                                        {
-                                            "dotProduct", new BsonDocument("$reduce", new BsonDocument
-                                            {
-                                                {
-                                                    "input",
-                                                    new BsonDocument("$range",
-                                                        new BsonArray { 0, queryEmbedding.Count })
-                                                },
-                                                { "initialValue", 0.0 },
-                                                {
-                                                    "in", new BsonDocument("$add", new BsonArray
-                                                    {
-                                                        "$$value",
-                                                        new BsonDocument("$multiply", new BsonArray
-                                                        {
-                                                            new BsonDocument("$arrayElemAt",
-                                                                new BsonArray { "$embedding", "$$this" }),
-                                                            new BsonDocument("$arrayElemAt",
-                                                                new BsonArray { queryEmbeddingArray, "$$this" })
-                                                        })
-                                                    })
-                                                }
-                                            })
-                                        },
-                                        {
-                                            "magnitude1", new BsonDocument("$sqrt", new BsonDocument("$reduce",
-                                                new BsonDocument
-                                                {
-                                                    { "input", "$embedding" },
-                                                    { "initialValue", 0.0 },
-                                                    {
-                                                        "in", new BsonDocument("$add", new BsonArray
-                                                        {
-                                                            "$$value",
-                                                            new BsonDocument("$multiply",
-                                                                new BsonArray { "$$this", "$$this" })
-                                                        })
-                                                    }
-                                                }))
-                                        },
-                                        {
-                                            "magnitude2", new BsonDocument("$sqrt", new BsonDocument("$reduce",
-                                                new BsonDocument
-                                                {
-                                                    { "input", queryEmbeddingArray },
-                                                    { "initialValue", 0.0 },
-                                                    {
-                                                        "in", new BsonDocument("$add", new BsonArray
-                                                        {
-                                                            "$$value",
-                                                            new BsonDocument("$multiply",
-                                                                new BsonArray { "$$this", "$$this" })
-                                                        })
-                                                    }
-                                                }))
-                                        }
-                                    }
-                                },
-                                {
-                                    "in", new BsonDocument("$divide", new BsonArray
-                                    {
-                                        "$$dotProduct",
-                                        new BsonDocument("$multiply", new BsonArray { "$$magnitude1", "$$magnitude2" })
+                                        new BsonDocument("$arrayElemAt", new BsonArray { "$embedding", "$$this" }),
+                                        new BsonDocument("$arrayElemAt", new BsonArray { queryEmbeddingArray, "$$this" })
                                     })
-                                }
-                            }),
-                            0.0
+                                })
+                            }
                         })
                     }
                 }),
 
-                // Filtrujemy wyniki z minimalnym score (obniżony próg)
-                new BsonDocument("$match", new BsonDocument("finalScore", new BsonDocument("$gt", 0.1))),
-
-                // Sortujemy po końcowym score
-                new BsonDocument("$sort", new BsonDocument("finalScore", -1)),
-
-                // Limit wyników
+                // Bez żadnego filtrowania - po prostu sortujemy i zwracamy top N
+                new BsonDocument("$sort", new BsonDocument("similarity", -1)),
                 new BsonDocument("$limit", limit)
             };
 
             var results = await _emails.Aggregate<EmailDocument>(pipeline).ToListAsync();
-            _logger.LogInformation("Found {Count} similar emails", results.Count);
+            _logger.LogInformation("Found {Count} emails", results.Count);
 
             foreach (var result in results)
             {
                 _logger.LogInformation(
-                    "Found: Subject: {Subject}  | VectorSimilarity: {Similarity:F2} ",
+                    "Email: {Subject}, Similarity: {Similarity}",
                     result.Subject,
                     result.Similarity);
             }
