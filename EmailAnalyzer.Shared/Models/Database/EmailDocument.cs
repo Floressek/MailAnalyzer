@@ -23,7 +23,7 @@ public class EmailDocument
     
     [BsonElement("similarity")]
     [BsonIgnoreIfNull]
-    public double Similarity { get; set; }
+    public double? Similarity { get; set; }
     
     [BsonElement("text_match")]
     public double TextMatch { get; set; }
