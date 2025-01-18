@@ -1,5 +1,7 @@
 using EmailAnalyzer.Server.Services;
+using EmailAnalyzer.Server.Services.Database;
 using EmailAnalyzer.Server.Services.Email;
+using EmailAnalyzer.Server.Services.OpenAI;
 using EmailAnalyzer.Shared.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -44,6 +46,16 @@ builder.Services.AddScoped<IEmailServiceFactory>(sp =>
 builder.Services.AddSingleton<ServerTokenStorageService>();
 builder.Services.AddSingleton<ITokenStorageService, ServerTokenStorageService>();
 
+// MongoDB configuration
+builder.Services.Configure<MongoDBConfiguration>(builder.Configuration.GetSection("MongoDB"));
+builder.Services.AddSingleton<MongoDBService>();
+
+// OpenAI configuration
+builder.Services.Configure<OpenAIConfiguration>(builder.Configuration.GetSection("OpenAI"));
+builder.Services.AddScoped<OpenAIService>();
+
+// Configure HttpClient for OpenAI service
+builder.Services.AddHttpClient<OpenAIService>();
 
 // CORS configuration
 builder.Services.AddCors(options =>
