@@ -96,6 +96,14 @@ public class ServerTokenStorageService : ITokenStorageService
 
     public Dictionary<string, (string accessToken, string refreshToken, DateTime expiresAt)> GetAllTokens()
     {
+        _logger.LogInformation("Fetching all tokens. Current tokens count: {Count}", _tokens.Count);
+
+        foreach (var (key, value) in _tokens)
+        {
+            _logger.LogDebug("Token for provider {Provider}: AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
+                key, value.accessToken, value.refreshToken, value.expiresAt);
+        }
+
         return _tokens.ToDictionary(entry => entry.Key, entry => entry.Value);
     }
 }
