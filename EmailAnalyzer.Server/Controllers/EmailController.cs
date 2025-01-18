@@ -187,10 +187,11 @@ public class EmailController : ControllerBase
                     Count = b.EmailCount,
                     Keywords = new List<string>() // możesz dodać ekstrakcję słów kluczowych
                 }).ToList(),
-                Embedding = summary.BatchSummaries.FirstOrDefault()?.Embedding ?? new List<float>(), // Embedding do dodania
+                Embedding = summary.BatchSummaries.FirstOrDefault()?.Embedding ??
+                            new List<float>(), // Embedding do dodania
                 CreatedAt = DateTime.UtcNow
             };
-            
+
             // Save to MongoDB
             await _mongoDBService.SaveSummaryAsync(summaryDocument);
 
@@ -252,13 +253,13 @@ public class EmailController : ControllerBase
         }
 
         var service = _emailServiceFactory.GetService(provider);
-        var emails =  await service.GetEmailsByDateAsync(startDate, endDate);
-        
+        var emails = await service.GetEmailsByDateAsync(startDate, endDate);
+
         // Zapisujemy kazdy mail do mongosa ;))
         // Przetwarzaj maile w tle - generuj embeddingi i zapisuj do MongoDB
-        _ = Task.Run(async () => 
+        _ = Task.Run(async () =>
         {
-            try 
+            try
             {
                 await _emailProcessingService.ProcessEmailBatchAsync(emails, provider);
                 _logger.LogInformation("Successfully processed and saved {Count} emails with embeddings", emails.Count);
@@ -271,7 +272,7 @@ public class EmailController : ControllerBase
 
         return emails;
     }
-    
+
     /// <summary>
     /// Heltcheck for the MongoDB connection.
     /// </summary>
@@ -299,7 +300,7 @@ public class EmailController : ControllerBase
             });
         }
     }
-    
+
     /// <summary>
     /// This module is used to search for emails based on the provided query.
     /// </summary>
@@ -310,7 +311,7 @@ public class EmailController : ControllerBase
     /// <param name="limit"></param>
     /// <returns></returns>
     [HttpGet("{provider}/search")]
-    public async Task<ActionResult<List<EmailDocument>>> SemanticSearch(
+    public async Task<ActionResult<SearchResult>> SemanticSearch(
         string provider,
         [FromQuery] string query,
         [FromQuery] DateTime? startDate = null,
@@ -320,13 +321,10 @@ public class EmailController : ControllerBase
         try
         {
             _logger.LogInformation(
-                "Semantic search request. Query: {Query}, Provider: {Provider}, DateRange: {StartDate} - {EndDate}",
-                query, provider, startDate, endDate);
+                "Semantic search request. Query: {Query}, Provider: {Provider}",
+                query, provider);
 
-            // Generuj embedding dla zapytania
             var queryEmbedding = await _openAIService.GenerateEmbeddingAsync(query);
-        
-            // Wyszukaj podobne maile
             var similarEmails = await _mongoDBService.FindSimilarEmailsAsync(
                 queryEmbedding,
                 provider,
@@ -334,10 +332,22 @@ public class EmailController : ControllerBase
                 endDate,
                 limit);
 
-            _logger.LogInformation("Found {Count} similar emails for query: {Query}", 
-                similarEmails.Count, query);
-        
-            return Ok(similarEmails);
+            // Dodajemy więcej kontekstu do odpowiedzi
+            var result = new SearchResult
+            {
+                Query = query,
+                TotalResults = similarEmails.Count,
+                Results = similarEmails.Select(email => new SearchResultItem
+                {
+                    Subject = email.Subject,
+                    From = email.From,
+                    ReceivedDate = email.ReceivedDate,
+                    Similarity = email.Similarity,
+                    Content = email.Content
+                }).ToList()
+            };
+
+            return Ok(result);
         }
         catch (Exception ex)
         {
@@ -345,5 +355,21 @@ public class EmailController : ControllerBase
             return StatusCode(500, "Error performing semantic search");
         }
     }
-    
+
+// Nowe klasy do zwracania wyników:
+    public class SearchResult
+    {
+        public string Query { get; set; } = string.Empty;
+        public int TotalResults { get; set; }
+        public List<SearchResultItem> Results { get; set; } = new();
+    }
+
+    public class SearchResultItem
+    {
+        public string Subject { get; set; } = string.Empty;
+        public string From { get; set; } = string.Empty;
+        public DateTime ReceivedDate { get; set; }
+        public double Similarity { get; set; }
+        public string Content { get; set; } = string.Empty;
+    }
 }
