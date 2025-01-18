@@ -130,7 +130,8 @@ public class MongoDBService
                 .Set(e => e.From, email.From)
                 .Set(e => e.Content, email.Content)
                 .Set(e => e.ReceivedDate, email.ReceivedDate)
-                .Set(e => e.FetchedAt, DateTime.UtcNow);
+                .Set(e => e.FetchedAt, DateTime.UtcNow)
+                .Set(e => e.Embedding, email.Embedding);  // Dodane embeddigi
 
             var options = new UpdateOptions { IsUpsert = true }; // Insert if not exists
 
