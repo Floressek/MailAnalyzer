@@ -1,4 +1,6 @@
+using System.Data;
 using EmailAnalyzer.Server.Services.Email;
+using EmailAnalyzer.Shared.Models;
 using EmailAnalyzer.Shared.Services;
 using EmailAnalyzer.Shared.Models.Email;
 using Google.Apis.Auth.OAuth2;
@@ -22,6 +24,11 @@ public class EmailController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>
+    /// This module is used to test the connection to the specified provider.
+    /// </summary>
+    /// <param name="provider"></param>
+    /// <returns></returns>
     [HttpGet("test/{provider}")]
     public async Task<IActionResult> TestConnection(string provider)
     {
@@ -74,6 +81,44 @@ public class EmailController : ControllerBase
         {
             _logger.LogError(ex, "Error getting emails for {Provider}", provider);
             return StatusCode(500, "Error fetching emails");
+        }
+    }
+
+    /// <summary>
+    /// This module is used to get the available date range for the specified provider.
+    /// </summary>
+    /// <param name="provider"></param>
+    /// <returns></returns>
+    [HttpGet("available-range/{provider}")]
+    public async Task<ActionResult<DateRangeInfo>> GetAvailableDateRange(string provider)
+    {
+        try
+        {
+            var (accessToken, _, expiresAt) =
+                await _tokenStorageService.GetTokenAsync(provider); // _ is used to discard the refresh token
+            if (accessToken == null)
+            {
+                return Unauthorized("No token found. Please authenticate first");
+            }
+
+            if (expiresAt <= DateTime.UtcNow)
+            {
+                return Unauthorized("Token expired. Please re-authenticate");
+            }
+
+            return Ok(new DateRangeInfo
+            {
+                EarliestDate = DateTime.Today.AddMonths(-6), // FIXEME: CONSTRAINTS FOR THE AVAIABLE DATES
+                LatestDate = DateTime.Today,
+                DefaultStartDate = DateTime.Today.AddMonths(-1), // FIXEME: CONSTRAINTS FOR THE AVAIABLE DATES
+                DefaultEndDate = DateTime.Today,
+                Provider = provider
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting date range for {Provider}", provider);
+            return StatusCode(500, "Error fetching date range");
         }
     }
 }

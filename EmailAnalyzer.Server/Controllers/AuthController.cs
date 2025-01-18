@@ -58,13 +58,22 @@ public class AuthController : ControllerBase
                 return BadRequest(response);
             }
 
+            // Zapisz token na serwerze
             await _tokenStorageService.StoreTokenAsync(
                 request.Provider,
                 response.AccessToken!,
                 response.RefreshToken ?? "",
                 response.ExpiresAt
             );
-            return Ok(response);
+
+            // Zwróć token do klienta
+            return Ok(new AuthResponse
+            {
+                Success = true,
+                AccessToken = response.AccessToken,
+                RefreshToken = response.RefreshToken,
+                ExpiresAt = response.ExpiresAt
+            });
         }
         catch (Exception ex)
         {
