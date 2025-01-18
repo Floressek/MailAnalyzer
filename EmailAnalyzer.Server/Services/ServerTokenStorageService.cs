@@ -60,8 +60,8 @@ public class ServerTokenStorageService : ITokenStorageService
             var json = JsonSerializer.Serialize(_tokens);
             File.WriteAllText(_storageFilePath, json);
 
-            _logger.LogInformation("Token stored for {Provider} and saved to file at {Path}", provider,
-                _storageFilePath);
+            _logger.LogInformation("Token successfully saved to file at {Path}. File content: {Content}",
+                _storageFilePath, json);
             _logger.LogDebug(
                 "Stored token details: AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
                 accessToken, refreshToken, expiresAt);
