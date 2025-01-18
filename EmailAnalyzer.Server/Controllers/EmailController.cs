@@ -6,6 +6,8 @@ using EmailAnalyzer.Shared.Models.Email;
 using Google.Apis.Auth.OAuth2;
 using Microsoft.AspNetCore.Mvc;
 
+namespace EmailAnalyzer.Server.Controllers;
+
 [ApiController]
 [Route("api/[controller]")]
 public class EmailController : ControllerBase
