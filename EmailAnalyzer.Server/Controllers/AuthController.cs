@@ -172,4 +172,19 @@ public class AuthController : ControllerBase
             return StatusCode(500, "Internal Server Error");
         }
     }
+    
+    [HttpDelete("remove-token/{provider}")]
+    public async Task<IActionResult> RemoveToken(string provider)
+    {
+        try
+        {
+            await _tokenStorageService.RemoveTokenAsync(provider);
+            return Ok(new { message = "Token removed successfully" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error removing token for provider: {Provider}", provider);
+            return StatusCode(500, "Internal Server Error");
+        }
+    }
 }
