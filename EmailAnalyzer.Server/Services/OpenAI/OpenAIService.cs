@@ -144,7 +144,7 @@ public class OpenAIService
         }
     }
     
-    private async Task<List<float>> GenerateEmbeddingAsync(string text)
+    public async Task<List<float>> GenerateEmbeddingAsync(string text)
     {
         var request = new
         {
@@ -176,7 +176,8 @@ public class OpenAIService
                 new
                 {
                     role = "system",
-                    content = "You are an expert at analyzing and combining multiple email summaries into a cohesive final summary. Focus on identifying overall patterns, trends, and key insights."
+                    content = "You are an expert at analyzing and combining multiple email summaries " +
+                              "into a cohesive final summary. Focus on identifying overall patterns, trends, and key insights."
                 },
                 new
                 {

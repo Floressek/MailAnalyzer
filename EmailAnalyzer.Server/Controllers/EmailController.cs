@@ -21,19 +21,22 @@ public class EmailController : ControllerBase
     private readonly ILogger<EmailController> _logger;
     private readonly OpenAIService _openAIService;
     private readonly MongoDBService _mongoDBService;
+    private readonly EmailProcessingService _emailProcessingService;
 
     public EmailController(
         IEmailServiceFactory emailServiceFactory,
         ITokenStorageService tokenStorageService,
         ILogger<EmailController> logger,
         OpenAIService openAiService,
-        MongoDBService mongoDbService)
+        MongoDBService mongoDbService,
+        EmailProcessingService emailProcessingService)
     {
         _emailServiceFactory = emailServiceFactory;
         _tokenStorageService = tokenStorageService;
         _logger = logger;
         _openAIService = openAiService;
         _mongoDBService = mongoDbService;
+        _emailProcessingService = emailProcessingService;
     }
 
     /// <summary>
@@ -249,7 +252,24 @@ public class EmailController : ControllerBase
         }
 
         var service = _emailServiceFactory.GetService(provider);
-        return await service.GetEmailsByDateAsync(startDate, endDate);
+        var emails =  await service.GetEmailsByDateAsync(startDate, endDate);
+        
+        // Zapisujemy kazdy mail do mongosa ;))
+        // Przetwarzaj maile w tle - generuj embeddingi i zapisuj do MongoDB
+        _ = Task.Run(async () => 
+        {
+            try 
+            {
+                await _emailProcessingService.ProcessEmailBatchAsync(emails, provider);
+                _logger.LogInformation("Successfully processed and saved {Count} emails with embeddings", emails.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to process emails batch");
+            }
+        });
+
+        return emails;
     }
     
     /// <summary>

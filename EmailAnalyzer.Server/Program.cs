@@ -49,6 +49,7 @@ builder.Services.AddSingleton<ITokenStorageService, ServerTokenStorageService>()
 // MongoDB configuration
 builder.Services.Configure<MongoDBConfiguration>(builder.Configuration.GetSection("MongoDB"));
 builder.Services.AddSingleton<MongoDBService>();
+builder.Services.AddScoped<EmailProcessingService>();
 
 // OpenAI configuration
 builder.Services.Configure<OpenAIConfiguration>(builder.Configuration.GetSection("OpenAI"));

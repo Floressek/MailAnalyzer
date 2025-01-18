@@ -2,6 +2,8 @@
 using MongoDB.Driver;
 using EmailAnalyzer.Shared.Models.Email;
 using Microsoft.Extensions.Options;
+using MongoDB.Bson;
+
 
 namespace EmailAnalyzer.Server.Services.Database;
 
@@ -39,12 +41,12 @@ public class MongoDBService
         try
         {
             var mongoConnectionUrl = config.Value.ConnectionString;
-            _logger.LogInformation("Initializing MongoDB with connection string: {ConnectionString}", 
+            _logger.LogInformation("Initializing MongoDB with connection string: {ConnectionString}",
                 mongoConnectionUrl.Replace(config.Value.Password, "****"));
 
             var client = new MongoClient(mongoConnectionUrl);
             _database = client.GetDatabase(config.Value.DatabaseName);
-            
+
             _emails = _database.GetCollection<EmailDocument>("emails");
             _summaries = _database.GetCollection<EmailSummaryDocument>("summaries");
 
@@ -83,8 +85,8 @@ public class MongoDBService
             new CreateIndexModel<EmailDocument>(
                 Builders<EmailDocument>.IndexKeys
                     .Ascending(e => e.FetchedAt),
-                new CreateIndexOptions 
-                { 
+                new CreateIndexOptions
+                {
                     ExpireAfter = TimeSpan.FromDays(30) // TTL index - usuwa dokumenty po 30 dniach
                 }
             )
@@ -141,7 +143,7 @@ public class MongoDBService
             throw;
         }
     }
-    
+
     /// <summary>
     /// This method retrieves emails from the database based on the specified criteria.
     /// </summary>
@@ -160,8 +162,10 @@ public class MongoDBService
         {
             var filter = Builders<EmailDocument>.Filter.And(
                 Builders<EmailDocument>.Filter.Eq(e => e.Provider, provider), // Filtruj po dostawcy (provider)
-                Builders<EmailDocument>.Filter.Gte(e => e.ReceivedDate, startDate), // Filtruj po dacie odbioru (minimalna)
-                Builders<EmailDocument>.Filter.Lte(e => e.ReceivedDate, endDate) // Filtruj po dacie odbioru (maksymalna)
+                Builders<EmailDocument>.Filter.Gte(e => e.ReceivedDate,
+                    startDate), // Filtruj po dacie odbioru (minimalna)
+                Builders<EmailDocument>.Filter.Lte(e => e.ReceivedDate,
+                    endDate) // Filtruj po dacie odbioru (maksymalna)
             );
 
             return await _emails
@@ -197,6 +201,14 @@ public class MongoDBService
         }
     }
 
+    /// <summary>
+    /// This method retrieves summaries from the database based on the specified criteria.
+    /// </summary>
+    /// <param name="provider"></param>
+    /// <param name="startDate"></param>
+    /// <param name="endDate"></param>
+    /// <param name="limit"></param>
+    /// <returns></returns>
     public async Task<List<EmailSummaryDocument>> GetSummariesAsync(
         string provider,
         DateTime startDate,
@@ -223,24 +235,89 @@ public class MongoDBService
             throw;
         }
     }
-    
+
+    /// <summary>
+    /// This method retrieves collections from the database.
+    /// </summary>
+    /// <returns></returns>
     public async Task<List<string>> ListCollectionsAsync()
     {
         try
         {
             var collections = new List<string>();
             var cursor = await _database.ListCollectionNamesAsync();
-        
+
             while (await cursor.MoveNextAsync())
             {
                 collections.AddRange(cursor.Current);
             }
-        
+
             return collections;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to list collections");
+            throw;
+        }
+    }
+
+    public async Task<List<EmailDocument>> FindSimilarEmailsAsync(
+        List<float> queryEmbedding,
+        string provider,
+        DateTime? startDate = null,
+        DateTime? endDate = null,
+        int limit = 5)
+    {
+        try
+        {
+            var filterBuilder = Builders<EmailDocument>.Filter;
+            var filters = new List<FilterDefinition<EmailDocument>>
+            {
+                filterBuilder.Eq(e => e.Provider, provider)
+            };
+
+            if (startDate.HasValue)
+                filters.Add(filterBuilder.Gte(e => e.ReceivedDate, startDate.Value));
+            if (endDate.HasValue)
+                filters.Add(filterBuilder.Lte(e => e.ReceivedDate, endDate.Value));
+
+            var filter = filterBuilder.And(filters);
+            
+            // Find similar emails
+            var vector = BsonValue.Create(queryEmbedding);
+            
+            // Dodaj operację wyszukiwania wektorowego
+            // Możemy użyć $vectorSearch jeśli mamy Atlas z obsługą wektorów
+            var pipeline = new[]
+            {
+                new BsonDocument("$match", filter.Render(
+                    _emails.DocumentSerializer,
+                    _emails.Settings.SerializerRegistry)),
+
+                new BsonDocument("$addFields", new BsonDocument
+                {
+                    {
+                        "similarity", new BsonDocument("$function", new BsonDocument
+                        {
+                            { "body", "function(v1, v2) { return v1.reduce((acc, val, i) => acc + val * v2[i], 0) / (Math.sqrt(v1.reduce((acc, val) => acc + val * val, 0)) * Math.sqrt(v2.reduce((acc, val) => acc + val * val, 0))); }" },
+                            { "args", new BsonArray { "$embedding", new BsonArray(queryEmbedding) } },
+                            { "lang", "js" }
+                        })
+                    }
+                }),
+
+                new BsonDocument("$sort", new BsonDocument("similarity", -1)),
+
+                new BsonDocument("$limit", limit)
+            };
+
+            var results = await _emails.Aggregate<EmailDocument>(pipeline).ToListAsync();
+            _logger.LogInformation("Found {Count} similar emails", results.Count);
+            return results;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to find similar emails");
             throw;
         }
     }
