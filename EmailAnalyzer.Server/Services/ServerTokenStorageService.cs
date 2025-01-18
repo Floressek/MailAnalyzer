@@ -28,6 +28,8 @@ public class ServerTokenStorageService : ITokenStorageService
             if (File.Exists(_storageFilePath))
             {
                 var json = File.ReadAllText(_storageFilePath);
+                _logger.LogInformation("Loaded JSON from file: {Json}", json);
+
                 var tokens = JsonSerializer.Deserialize<Dictionary<string, (string accessToken, string refreshToken, DateTime expiresAt)>>(json);
 
                 if (tokens != null)
@@ -35,18 +37,24 @@ public class ServerTokenStorageService : ITokenStorageService
                     foreach (var (key, value) in tokens)
                     {
                         _tokens.TryAdd(key, value);
+                        _logger.LogInformation("Loaded token for provider: {Provider}, AccessToken: {AccessToken}, RefreshToken: {RefreshToken}, ExpiresAt: {ExpiresAt}",
+                            key, value.accessToken, value.refreshToken, value.expiresAt);
                     }
-                    _logger.LogInformation("Tokens successfully loaded from file. Token count: {Count}", tokens.Count);
+                    _logger.LogInformation("Tokens successfully loaded. Count: {Count}", tokens.Count);
                 }
                 else
                 {
-                    _logger.LogWarning("No tokens found in file.");
+                    _logger.LogWarning("Deserialized tokens are null.");
                 }
+            }
+            else
+            {
+                _logger.LogWarning("Token file does not exist at path: {Path}", _storageFilePath);
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to load tokens from file");
+            _logger.LogError(ex, "Error loading tokens from file");
         }
     }
 
@@ -124,7 +132,7 @@ public class ServerTokenStorageService : ITokenStorageService
 
         foreach (var (key, value) in _tokens)
         {
-            _logger.LogDebug("Token for provider {Provider}: AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
+            _logger.LogDebug("Token in _tokens: Provider={Provider}, AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
                 key, value.accessToken, value.refreshToken, value.expiresAt);
         }
 
