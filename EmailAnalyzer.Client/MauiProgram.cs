@@ -21,11 +21,16 @@ public static class MauiProgram
             });
 
         Console.WriteLine("Registering services...");
-
-        builder.Services.AddSingleton<ITokenStorageService, SecureTokenStorageService>();
-        builder.Services.AddSingleton<AppShell>(); // Dodaj to
+        
+        builder.Services.AddHttpClient<ITokenStorageService, ClientTokenStorageService>(client =>
+        {
+            client.BaseAddress = new Uri("https://mailanalyzer-production.up.railway.app/");
+        });
+        
+        builder.Services.AddHttpClient();
+        builder.Services.AddSingleton<AppShell>();
         builder.Services.AddTransient<LoginPage>();
-
+        builder.Services.AddTransient<DateSelectionPage>();
 #if DEBUG
         builder.Logging.AddDebug();
         builder.Logging.SetMinimumLevel(LogLevel.Trace);
