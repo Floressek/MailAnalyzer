@@ -10,7 +10,7 @@ public class EmailDocument
     public string Id { get; set; } = string.Empty;
 
     public string Provider { get; set; } = string.Empty;
-    public string EmailId { get; set; } = string.Empty; // ID z Gmail/Outlook
+    public string EmailId { get; set; } = string.Empty;
     public string Subject { get; set; } = string.Empty;
     public string From { get; set; } = string.Empty;
     public DateTime ReceivedDate { get; set; }
@@ -20,6 +20,7 @@ public class EmailDocument
     public DateTime? AnalyzedAt { get; set; }
     public List<string> Labels { get; set; } = new();
     
+    [BsonElement("similarity")]
     [BsonIgnoreIfNull]
     public double Similarity { get; set; }
 }
