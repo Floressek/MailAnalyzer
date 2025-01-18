@@ -1,6 +1,7 @@
 using System.Data;
 using EmailAnalyzer.Server.Services.Email;
 using EmailAnalyzer.Shared.Models;
+using EmailAnalyzer.Shared.Models.Auth;
 using EmailAnalyzer.Shared.Services;
 using EmailAnalyzer.Shared.Models.Email;
 using Google.Apis.Auth.OAuth2;
@@ -70,9 +71,23 @@ public class EmailController : ControllerBase
                 return Unauthorized("No token found. Please authenticate first");
             }
 
-            if (expiresAt <= DateTime.UtcNow)
+            // Jeśli token wygasa za mniej niż 5 minut, spróbuj go odświeżyć
+            if (expiresAt <= DateTime.UtcNow.AddMinutes(5))
             {
-                return Unauthorized("Token expired. Please re-authenticate");
+                var emailService = _emailServiceFactory.GetService(provider);
+                var refreshSuccess = await emailService.RefreshTokenAsync(new UserCredentials 
+                { 
+                    RefreshToken = refreshToken,
+                    Provider = provider
+                });
+
+                if (!refreshSuccess)
+                {
+                    return Unauthorized("Token expired and refresh failed. Please re-authenticate");
+                }
+
+                // Pobierz nowy token po odświeżeniu
+                (accessToken, refreshToken, expiresAt) = await _tokenStorageService.GetTokenAsync(provider);
             }
 
             var service = _emailServiceFactory.GetService(provider);

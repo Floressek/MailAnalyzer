@@ -43,23 +43,25 @@ public class ServerTokenStorageService : ITokenStorageService
         _tokens.AddOrUpdate(provider, 
             (accessToken, refreshToken, expiresAt), 
             (_, _) => (accessToken, refreshToken, expiresAt));
-        
+
         try
         {
             // Upewnij się że katalog istnieje
             Directory.CreateDirectory(Path.GetDirectoryName(_storageFilePath)!);
-            
+
             // Zapisz do pliku
             var json = JsonSerializer.Serialize(_tokens);
             File.WriteAllText(_storageFilePath, json);
-            
-            _logger.LogInformation("Token stored for {Provider} and saved to file", provider);
+
+            _logger.LogInformation("Token stored for {Provider} and saved to file at {Path}", provider, _storageFilePath);
+            _logger.LogDebug("Stored token details: AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}", 
+                accessToken, refreshToken, expiresAt);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to save tokens to file");
         }
-        
+
         return Task.CompletedTask;
     }
 
@@ -79,5 +81,10 @@ public class ServerTokenStorageService : ITokenStorageService
         _tokens.TryRemove(provider, out _);
         _logger.LogInformation("Tokens removed for {Provider}", provider);
         return Task.CompletedTask;
+    }
+    
+    public Dictionary<string, (string accessToken, string refreshToken, DateTime expiresAt)> GetAllTokens()
+    {
+        return _tokens.ToDictionary(entry => entry.Key, entry => entry.Value);
     }
 }

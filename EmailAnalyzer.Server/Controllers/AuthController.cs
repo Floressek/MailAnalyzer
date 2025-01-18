@@ -1,3 +1,4 @@
+using EmailAnalyzer.Server.Services;
 using Microsoft.AspNetCore.Mvc;
 using EmailAnalyzer.Shared.Models.Auth;
 using EmailAnalyzer.Shared.Services;
@@ -139,4 +140,28 @@ public class AuthController : ControllerBase
             return Content($"<html><body><h1>Error during authentication: {ex.Message}</h1></body></html>", "text/html");
         }
     }
+    
+    [HttpGet("all-tokens")]
+    public IActionResult GetAllTokens()
+    {
+        try
+        {
+            // Pobierz wszystkie zapisane tokeny
+            var storage = HttpContext.RequestServices.GetService<ITokenStorageService>();
+            var tokens = storage as ServerTokenStorageService;
+
+            if (tokens == null)
+            {
+                return NotFound(new { error = "Token storage service not found" });
+            }
+
+            return Ok(tokens.GetAllTokens());
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving all tokens");
+            return StatusCode(500, new { error = "Error retrieving tokens", details = ex.Message });
+        }
+    }
+    
 }

@@ -33,6 +33,7 @@ public class OutlookEmailService : IEmailService
     private readonly IConfidentialClientApplication _msalClient;
     // private readonly IPublicClientApplication _msalClient;
     private GraphServiceClient? _graphClient;
+    private ServerTokenStorageService _tokenStorageService;
 
     /// <summary>
     /// This constructor initializes the email service. FOR OUTLOOK.
@@ -41,10 +42,13 @@ public class OutlookEmailService : IEmailService
     /// <param name="logger"></param>
     public OutlookEmailService(
         IOptions<OutlookConfiguration> config,
-        ILogger<OutlookEmailService> logger)
+        ILogger<OutlookEmailService> logger, 
+        ServerTokenStorageService tokenStorageService)
+    
     {
         _config = config.Value;
         _logger = logger;
+        _tokenStorageService = tokenStorageService;
 
         // Initialize MSAL client
         _msalClient = ConfidentialClientApplicationBuilder
@@ -140,6 +144,18 @@ public class OutlookEmailService : IEmailService
             return new List<EmailMessage>(); // Return empty list
         }
 
+        // Sprawdź token przed próbą pobrania maili
+        var (accessToken, refreshToken, expiresAt) = await _tokenStorageService.GetTokenAsync("outlook");
+        if (string.IsNullOrEmpty(accessToken) || expiresAt <= DateTime.UtcNow)
+        {
+            _logger.LogWarning("Outlook token not found or expired. Please authenticate first.");
+            return new List<EmailMessage>();
+        }
+        
+        var httpClient = new HttpClient();
+        httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
+        _graphClient = new GraphServiceClient(httpClient);
+        
         try
         {
             _logger.LogInformation("Retrieving emails from {StartDate} to {EndDate}", startDate, endDate);
