@@ -131,7 +131,7 @@ public class MongoDBService
                 .Set(e => e.Content, email.Content)
                 .Set(e => e.ReceivedDate, email.ReceivedDate)
                 .Set(e => e.FetchedAt, DateTime.UtcNow)
-                .Set(e => e.Embedding, email.Embedding);  // Dodane embeddigi
+                .Set(e => e.Embedding, email.Embedding); // Dodane embeddigi
 
             var options = new UpdateOptions { IsUpsert = true }; // Insert if not exists
 
@@ -262,6 +262,72 @@ public class MongoDBService
         }
     }
 
+    // public async Task<List<EmailDocument>> FindSimilarEmailsAsync(
+    //     List<float> queryEmbedding,
+    //     string provider,
+    //     DateTime? startDate = null,
+    //     DateTime? endDate = null,
+    //     int limit = 5)
+    // {
+    //     try
+    //     {
+    //         var filterBuilder = Builders<EmailDocument>.Filter;
+    //         var filters = new List<FilterDefinition<EmailDocument>>
+    //         {
+    //             filterBuilder.Eq(e => e.Provider, provider)
+    //         };
+    //
+    //         if (startDate.HasValue)
+    //             filters.Add(filterBuilder.Gte(e => e.ReceivedDate, startDate.Value));
+    //         if (endDate.HasValue)
+    //             filters.Add(filterBuilder.Lte(e => e.ReceivedDate, endDate.Value));
+    //
+    //         var filter = filterBuilder.And(filters);
+    //
+    //         // Find similar emails
+    //         var vector = BsonValue.Create(queryEmbedding);
+    //
+    //         // Dodaj operację wyszukiwania wektorowego
+    //         // Możemy użyć $vectorSearch jeśli mamy Atlas z obsługą wektorów
+    //         var pipeline = new[]
+    //         {
+    //             // Filter out documents with null or missing embedding
+    //             new BsonDocument("$match", new BsonDocument("embedding", new BsonDocument("$ne", BsonNull.Value))),
+    //
+    //             // Compute similarity
+    //             new BsonDocument("$addFields", new BsonDocument
+    //             {
+    //                 {
+    //                     "similarity", new BsonDocument("$function", new BsonDocument
+    //                     {
+    //                         {
+    //                             "body",
+    //                             "function(v1, v2) { return v1.reduce((acc, val, i) => acc + val * v2[i], 0) / (Math.sqrt(v1.reduce((acc, val) => acc + val * val, 0)) * Math.sqrt(v2.reduce((acc, val) => acc + val * val, 0))); }"
+    //                         },
+    //                         { "args", new BsonArray { "$embedding", new BsonArray(queryEmbedding) } },
+    //                         { "lang", "js" }
+    //                     })
+    //                 }
+    //             }),
+    //
+    //             // Sort by similarity
+    //             new BsonDocument("$sort", new BsonDocument("similarity", -1)),
+    //
+    //             // Limit results
+    //             new BsonDocument("$limit", limit)
+    //         };
+    //
+    //         var results = await _emails.Aggregate<EmailDocument>(pipeline).ToListAsync();
+    //         _logger.LogInformation("Found {Count} similar emails", results.Count);
+    //         return results;
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         _logger.LogError(ex, "Failed to find similar emails");
+    //         throw;
+    //     }
+    // }
+
     public async Task<List<EmailDocument>> FindSimilarEmailsAsync(
         List<float> queryEmbedding,
         string provider,
@@ -271,10 +337,28 @@ public class MongoDBService
     {
         try
         {
+            // Najpierw sprawdźmy czy w ogóle mamy maile z embeddingami
+            var testFilter = Builders<EmailDocument>.Filter.And(
+                Builders<EmailDocument>.Filter.Eq(e => e.Provider, provider),
+                Builders<EmailDocument>.Filter.Ne(e => e.Embedding, null),
+                Builders<EmailDocument>.Filter.SizeGt(e => e.Embedding, 0)
+            );
+
+            var testCount = await _emails.CountDocumentsAsync(testFilter);
+            _logger.LogInformation("Found {Count} emails with embeddings for provider {Provider}", testCount, provider);
+
+            if (testCount == 0)
+            {
+                _logger.LogWarning("No emails with embeddings found!");
+                return new List<EmailDocument>();
+            }
+
             var filterBuilder = Builders<EmailDocument>.Filter;
             var filters = new List<FilterDefinition<EmailDocument>>
             {
-                filterBuilder.Eq(e => e.Provider, provider)
+                filterBuilder.Eq(e => e.Provider, provider),
+                filterBuilder.Ne(e => e.Embedding, null), // Embedding nie może być null
+                filterBuilder.SizeGt(e => e.Embedding, 0) // Embedding musi mieć elementy
             };
 
             if (startDate.HasValue)
@@ -283,39 +367,54 @@ public class MongoDBService
                 filters.Add(filterBuilder.Lte(e => e.ReceivedDate, endDate.Value));
 
             var filter = filterBuilder.And(filters);
-            
-            // Find similar emails
-            var vector = BsonValue.Create(queryEmbedding);
-            
-            // Dodaj operację wyszukiwania wektorowego
-            // Możemy użyć $vectorSearch jeśli mamy Atlas z obsługą wektorów
+
+            _logger.LogInformation("Executing similarity search pipeline");
+
             var pipeline = new[]
             {
-                // Filter out documents with null or missing embedding
-                new BsonDocument("$match", new BsonDocument("embedding", new BsonDocument("$ne", BsonNull.Value))),
+                new BsonDocument("$match", filter.Render(
+                    _emails.DocumentSerializer,
+                    _emails.Settings.SerializerRegistry)),
 
-                // Compute similarity
                 new BsonDocument("$addFields", new BsonDocument
                 {
                     {
-                        "similarity", new BsonDocument("$function", new BsonDocument
+                        "similarity", new BsonDocument("$reduce", new BsonDocument
                         {
-                            { "body", "function(v1, v2) { return v1.reduce((acc, val, i) => acc + val * v2[i], 0) / (Math.sqrt(v1.reduce((acc, val) => acc + val * val, 0)) * Math.sqrt(v2.reduce((acc, val) => acc + val * val, 0))); }" },
-                            { "args", new BsonArray { "$embedding", new BsonArray(queryEmbedding) } },
-                            { "lang", "js" }
+                            {
+                                "input",
+                                new BsonDocument("$range", new BsonArray { 0, new BsonArray(queryEmbedding).Count })
+                            },
+                            { "initialValue", 0.0 },
+                            {
+                                "in", new BsonDocument("$add", new BsonArray
+                                {
+                                    "$$value",
+                                    new BsonDocument("$multiply", new BsonArray
+                                    {
+                                        new BsonDocument("$arrayElemAt", new BsonArray { "$embedding", "$$this" }),
+                                        new BsonDocument("$arrayElemAt",
+                                            new BsonArray { new BsonArray(queryEmbedding), "$$this" })
+                                    })
+                                })
+                            }
                         })
                     }
                 }),
 
-                // Sort by similarity
                 new BsonDocument("$sort", new BsonDocument("similarity", -1)),
-
-                // Limit results
                 new BsonDocument("$limit", limit)
             };
 
             var results = await _emails.Aggregate<EmailDocument>(pipeline).ToListAsync();
             _logger.LogInformation("Found {Count} similar emails", results.Count);
+
+            foreach (var result in results)
+            {
+                _logger.LogInformation("Found similar email: {Subject} with embedding length: {Length}",
+                    result.Subject, result.Embedding?.Count ?? 0);
+            }
+
             return results;
         }
         catch (Exception ex)
