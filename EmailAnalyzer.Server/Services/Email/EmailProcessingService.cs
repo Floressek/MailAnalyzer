@@ -73,7 +73,7 @@ public class EmailProcessingService
             }
         }
     }
-    
+
     /// <summary>
     /// This method retrieves emails from the database based on the specified criteria.
     /// </summary>
@@ -84,13 +84,14 @@ public class EmailProcessingService
     /// <param name="limit"></param>
     /// <returns></returns>
     public async Task<List<EmailDocument>> FindSimilarEmailsAsync(
-        string query, 
-        string provider, 
-        DateTime? startDate = null, 
+        string query,
+        string provider,
+        DateTime? startDate = null,
         DateTime? endDate = null,
         int limit = 5)
     {
         var queryEmbedding = await _openAIService.GenerateEmbeddingAsync(query); // Generate embedding for query
-        return await _mongoDBService.FindSimilarEmailsAsync(queryEmbedding, provider, startDate, endDate, limit); // Find similar emails
+        return await _mongoDBService.FindSimilarEmailsAsync(queryEmbedding, provider, query, startDate, endDate,
+            limit); // Find similar emails
     }
 }

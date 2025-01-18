@@ -328,6 +328,7 @@ public class EmailController : ControllerBase
             var similarEmails = await _mongoDBService.FindSimilarEmailsAsync(
                 queryEmbedding,
                 provider,
+                query,
                 startDate,
                 endDate,
                 limit);

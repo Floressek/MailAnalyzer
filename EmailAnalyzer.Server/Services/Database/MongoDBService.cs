@@ -331,6 +331,7 @@ public class MongoDBService
     public async Task<List<EmailDocument>> FindSimilarEmailsAsync(
         List<float> queryEmbedding,
         string provider,
+        string query,  // Dodany parametr query
         DateTime? startDate = null,
         DateTime? endDate = null,
         int limit = 5)
@@ -386,13 +387,16 @@ public class MongoDBService
             _logger.LogInformation("Executing similarity search pipeline");
 
             var queryEmbeddingArray = new BsonArray(queryEmbedding.Select(x => (double)x));
+            var queryRegex = new BsonRegularExpression(query, "i");
 
             var pipeline = new[]
             {
+                // Podstawowy match na podstawie filtrów (provider, daty itp.)
                 new BsonDocument("$match", filter.Render(
                     _emails.DocumentSerializer,
                     _emails.Settings.SerializerRegistry)),
 
+                // Obliczamy vector similarity
                 new BsonDocument("$addFields", new BsonDocument
                 {
                     {
@@ -473,9 +477,14 @@ public class MongoDBService
                         })
                     }
                 }),
-                // Po obliczeniu similarity, a przed sortem:
-                new BsonDocument("$match", new BsonDocument("similarity", new BsonDocument("$gt", 0.7))), // próg 0.7
-                new BsonDocument("$sort", new BsonDocument("similarity", -1)),
+
+                // Filtrujemy wyniki z minimalnym score (obniżony próg)
+                new BsonDocument("$match", new BsonDocument("finalScore", new BsonDocument("$gt", 0.1))),
+
+                // Sortujemy po końcowym score
+                new BsonDocument("$sort", new BsonDocument("finalScore", -1)),
+
+                // Limit wyników
                 new BsonDocument("$limit", limit)
             };
 
@@ -485,7 +494,7 @@ public class MongoDBService
             foreach (var result in results)
             {
                 _logger.LogInformation(
-                    "Found similar email: Subject: {Subject}, Similarity: {Similarity:F3}",
+                    "Found: Subject: {Subject}  | VectorSimilarity: {Similarity:F2} ",
                     result.Subject,
                     result.Similarity);
             }

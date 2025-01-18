@@ -3,6 +3,7 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace EmailAnalyzer.Shared.Models.Database;
 
+[BsonIgnoreExtraElements]
 public class EmailDocument
 {
     [BsonId]
@@ -23,6 +24,12 @@ public class EmailDocument
     [BsonElement("similarity")]
     [BsonIgnoreIfNull]
     public double Similarity { get; set; }
+    
+    [BsonElement("text_match")]
+    public double TextMatch { get; set; }
+    
+    [BsonElement("final_score")]
+    public double FinalScore { get; set; }
 }
 
 public class SentimentInfo
