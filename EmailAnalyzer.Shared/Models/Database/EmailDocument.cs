@@ -19,7 +19,9 @@ public class EmailDocument
     public DateTime FetchedAt { get; set; } = DateTime.UtcNow;
     public DateTime? AnalyzedAt { get; set; }
     public List<string> Labels { get; set; } = new();
-    public SentimentInfo? Sentiment { get; set; }
+    
+    [BsonIgnoreIfNull]
+    public double Similarity { get; set; }
 }
 
 public class SentimentInfo
