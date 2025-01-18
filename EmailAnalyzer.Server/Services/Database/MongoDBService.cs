@@ -379,21 +379,25 @@ public class MongoDBService
                 new BsonDocument("$addFields", new BsonDocument
                 {
                     {
-                        "similarity", new BsonDocument("$reduce", new BsonDocument
+                        "similarity", new BsonDocument("$ifNull", new BsonArray
                         {
-                            { "input", new BsonDocument("$range", new BsonArray { 0, new BsonArray(queryEmbedding).Count }) },
-                            { "initialValue", 0.0 },
+                            new BsonDocument("$reduce", new BsonDocument
                             {
-                                "in", new BsonDocument("$add", new BsonArray
+                                { "input", new BsonDocument("$range", new BsonArray { 0, new BsonArray(queryEmbedding).Count }) },
+                                { "initialValue", 0.0 },
                                 {
-                                    "$$value",
-                                    new BsonDocument("$multiply", new BsonArray
+                                    "in", new BsonDocument("$add", new BsonArray
                                     {
-                                        new BsonDocument("$arrayElemAt", new BsonArray { "$embedding", "$$this" }),
-                                        new BsonDocument("$arrayElemAt", new BsonArray { new BsonArray(queryEmbedding), "$$this" })
+                                        "$$value",
+                                        new BsonDocument("$multiply", new BsonArray
+                                        {
+                                            new BsonDocument("$arrayElemAt", new BsonArray { "$embedding", "$$this" }),
+                                            new BsonDocument("$arrayElemAt", new BsonArray { new BsonArray(queryEmbedding), "$$this" })
+                                        })
                                     })
-                                })
-                            }
+                                }
+                            }),
+                            0.0 // Domyślna wartość dla `similarity`, jeśli jest null
                         })
                     }
                 }),
