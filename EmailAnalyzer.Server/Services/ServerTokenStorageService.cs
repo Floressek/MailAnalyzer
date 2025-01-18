@@ -2,13 +2,17 @@
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
 using System.Text.Json;
+using EmailAnalyzer.Shared.Models.Auth;
 
 namespace EmailAnalyzer.Server.Services;
 
 public class ServerTokenStorageService : ITokenStorageService
 {
     private readonly ILogger<ServerTokenStorageService> _logger;
-    private static readonly ConcurrentDictionary<string, (string accessToken, string refreshToken, DateTime expiresAt)> _tokens = new();
+
+    private static readonly ConcurrentDictionary<string, (string accessToken, string refreshToken, DateTime expiresAt)>
+        _tokens = new();
+
     private readonly string _storageFilePath = "/token_vault/tokens.json";
 
     public ServerTokenStorageService(ILogger<ServerTokenStorageService> logger)
@@ -36,12 +40,12 @@ public class ServerTokenStorageService : ITokenStorageService
             _logger.LogError(ex, "Failed to load tokens from file");
         }
     }
-    
+
 
     public Task StoreTokenAsync(string provider, string accessToken, string refreshToken, DateTime expiresAt)
     {
-        _tokens.AddOrUpdate(provider, 
-            (accessToken, refreshToken, expiresAt), 
+        _tokens.AddOrUpdate(provider,
+            (accessToken, refreshToken, expiresAt),
             (_, _) => (accessToken, refreshToken, expiresAt));
 
         try
@@ -53,8 +57,10 @@ public class ServerTokenStorageService : ITokenStorageService
             var json = JsonSerializer.Serialize(_tokens);
             File.WriteAllText(_storageFilePath, json);
 
-            _logger.LogInformation("Token stored for {Provider} and saved to file at {Path}", provider, _storageFilePath);
-            _logger.LogDebug("Stored token details: AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}", 
+            _logger.LogInformation("Token stored for {Provider} and saved to file at {Path}", provider,
+                _storageFilePath);
+            _logger.LogDebug(
+                "Stored token details: AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
                 accessToken, refreshToken, expiresAt);
         }
         catch (Exception ex)
@@ -69,7 +75,8 @@ public class ServerTokenStorageService : ITokenStorageService
     {
         if (_tokens.TryGetValue(provider, out var token))
         {
-            return Task.FromResult<(string?, string?, DateTime)>((token.accessToken, token.refreshToken, token.expiresAt));
+            return Task.FromResult<(string?, string?, DateTime)>((token.accessToken, token.refreshToken,
+                token.expiresAt));
         }
 
         _logger.LogWarning("Token not found for {Provider}", provider);
@@ -82,7 +89,7 @@ public class ServerTokenStorageService : ITokenStorageService
         _logger.LogInformation("Tokens removed for {Provider}", provider);
         return Task.CompletedTask;
     }
-    
+
     public Dictionary<string, (string accessToken, string refreshToken, DateTime expiresAt)> GetAllTokens()
     {
         return _tokens.ToDictionary(entry => entry.Key, entry => entry.Value);
