@@ -85,6 +85,7 @@ public class ServerTokenStorageService : ITokenStorageService
 
             _logger.LogInformation("Serialized token JSON: {Json}", json);
             File.WriteAllText(_storageFilePath, json);
+            _logger.LogInformation("Final content of tokens.json: {Content}", File.ReadAllText(_storageFilePath));
 
             _logger.LogInformation("Token successfully saved to file at {Path}", _storageFilePath);
         }
