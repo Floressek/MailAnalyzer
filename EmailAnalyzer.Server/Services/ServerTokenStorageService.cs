@@ -10,15 +10,27 @@ public class ServerTokenStorageService : ITokenStorageService
 {
     private readonly ILogger<ServerTokenStorageService> _logger;
 
-    private static readonly ConcurrentDictionary<string, (string accessToken, string refreshToken, DateTime expiresAt)>
-        _tokens = new();
+    private static readonly ConcurrentDictionary<string, TokenData> _tokens = new();
 
     private readonly string _storageFilePath = "/token_vault/tokens.json";
 
     public ServerTokenStorageService(ILogger<ServerTokenStorageService> logger)
     {
         _logger = logger;
+        EnsureStoragePathExists();
         LoadTokens();
+    }
+    
+    private void EnsureStoragePathExists()
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_storageFilePath)!);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to ensure storage path exists at {Path}", _storageFilePath);
+        }
     }
 
     private void LoadTokens()
@@ -30,16 +42,18 @@ public class ServerTokenStorageService : ITokenStorageService
                 var json = File.ReadAllText(_storageFilePath);
                 _logger.LogInformation("Loaded JSON from file: {Json}", json);
 
-                var tokens = JsonSerializer.Deserialize<Dictionary<string, (string accessToken, string refreshToken, DateTime expiresAt)>>(json);
+                var tokens = JsonSerializer.Deserialize<Dictionary<string, TokenData>>(json);
 
                 if (tokens != null)
                 {
                     foreach (var (key, value) in tokens)
                     {
                         _tokens.TryAdd(key, value);
-                        _logger.LogInformation("Loaded token for provider: {Provider}, AccessToken: {AccessToken}, RefreshToken: {RefreshToken}, ExpiresAt: {ExpiresAt}",
-                            key, value.accessToken, value.refreshToken, value.expiresAt);
+                        _logger.LogInformation(
+                            "Loaded token for provider: {Provider}, AccessToken: {AccessToken}, RefreshToken: {RefreshToken}, ExpiresAt: {ExpiresAt}",
+                            key, value.AccessToken, value.RefreshToken, value.ExpiresAt);
                     }
+
                     _logger.LogInformation("Tokens successfully loaded. Count: {Count}", tokens.Count);
                 }
                 else
@@ -59,65 +73,49 @@ public class ServerTokenStorageService : ITokenStorageService
     }
 
 
-    public Task StoreTokenAsync(string provider, string accessToken, string refreshToken, DateTime expiresAt)
+
+    public async Task StoreTokenAsync(string provider, string accessToken, string refreshToken, DateTime expiresAt)
     {
-        _logger.LogInformation("Storing token for provider: {Provider}", provider);
-        _logger.LogDebug("Token details: AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
-            accessToken, refreshToken, expiresAt);
-
-        if (string.IsNullOrEmpty(accessToken))
-        {
-            _logger.LogError("AccessToken is null or empty for provider: {Provider}", provider);
-        }
-
         _tokens.AddOrUpdate(provider,
-            (accessToken, refreshToken, expiresAt),
-            (_, _) => (accessToken, refreshToken, expiresAt));
+            new TokenData { AccessToken = accessToken, RefreshToken = refreshToken, ExpiresAt = expiresAt },
+            (_, _) => new TokenData { AccessToken = accessToken, RefreshToken = refreshToken, ExpiresAt = expiresAt });
 
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_storageFilePath)!);
+            var serializableTokens = _tokens.ToDictionary(entry => entry.Key, entry => entry.Value);
+            var json = JsonSerializer.Serialize(serializableTokens, new JsonSerializerOptions
+            {
+                WriteIndented = true
+            });
 
-        // Konwersja ConcurrentDictionary na Dictionary
-        var serializableTokens = _tokens.ToDictionary(entry => entry.Key, entry => new
-        {
-            entry.Value.accessToken,
-            entry.Value.refreshToken,
-            entry.Value.expiresAt
-        });
-
-        var json = JsonSerializer.Serialize(serializableTokens, new JsonSerializerOptions
-        {
-            WriteIndented = true // Opcjonalnie: dla lepszej czytelności JSON
-        });
-
-            _logger.LogInformation("Serialized token JSON: {Json}", json);
-            File.WriteAllText(_storageFilePath, json);
-            _logger.LogInformation("Final content of tokens.json: {Content}", File.ReadAllText(_storageFilePath));
-
+            await File.WriteAllTextAsync(_storageFilePath, json);
             _logger.LogInformation("Token successfully saved to file at {Path}", _storageFilePath);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to save tokens to file");
         }
-
-        return Task.CompletedTask;
     }
+
+
 
 
     public Task<(string? accessToken, string? refreshToken, DateTime expiresAt)> GetTokenAsync(string provider)
     {
         if (_tokens.TryGetValue(provider, out var token))
         {
-            _logger.LogInformation("Retrieved token for {Provider}", provider);
-            return Task.FromResult<(string?, string?, DateTime)>((token.accessToken, token.refreshToken,
-                token.expiresAt));
+            _logger.LogInformation(
+                "Retrieved token for {Provider}: AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
+                provider, token.AccessToken, token.RefreshToken, token.ExpiresAt);
+
+            return Task.FromResult<(string?, string?, DateTime)>((token.AccessToken, token.RefreshToken, token.ExpiresAt));
         }
 
         _logger.LogWarning("Token not found for {Provider}", provider);
         return Task.FromResult<(string?, string?, DateTime)>((null, null, DateTime.MinValue));
     }
+
 
     public Task RemoveTokenAsync(string provider)
     {
@@ -126,16 +124,17 @@ public class ServerTokenStorageService : ITokenStorageService
         return Task.CompletedTask;
     }
 
-    public Dictionary<string, (string accessToken, string refreshToken, DateTime expiresAt)> GetAllTokens()
+    public Dictionary<string, TokenData> GetAllTokens()
     {
         _logger.LogInformation("Fetching all tokens. Current tokens count: {Count}", _tokens.Count);
 
         foreach (var (key, value) in _tokens)
         {
             _logger.LogDebug("Token in _tokens: Provider={Provider}, AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
-                key, value.accessToken, value.refreshToken, value.expiresAt);
+                key, value.AccessToken, value.RefreshToken, value.ExpiresAt);
         }
 
         return _tokens.ToDictionary(entry => entry.Key, entry => entry.Value);
     }
+
 }

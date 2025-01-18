@@ -27,7 +27,7 @@ public class AuthController : ControllerBase
         _tokenStorageService = tokenStorageService;
         _logger = logger;
     }
-    
+
     [HttpGet("url/{provider}")]
     public async Task<IActionResult> GetAuthUrl(string provider)
     {
@@ -46,7 +46,7 @@ public class AuthController : ControllerBase
             return BadRequest(new { error = "Could not generate auth URL" });
         }
     }
-    
+
     [HttpPost("authenticate")]
     public async Task<ActionResult<AuthResponse>> Authenticate([FromBody] AuthRequest request)
     {
@@ -57,7 +57,7 @@ public class AuthController : ControllerBase
             _logger.LogWarning("AuthCode is null or empty");
             return BadRequest("AuthCode is required");
         }
-        
+
         try
         {
             var authResponse = await _emailServiceFactory.GetService(request.Provider)
@@ -94,11 +94,11 @@ public class AuthController : ControllerBase
     {
         try
         {
-            _logger.LogInformation("Received callback with code length: {CodeLength} and state: {State}", 
+            _logger.LogInformation("Received callback with code length: {CodeLength} and state: {State}",
                 code?.Length ?? 0, state);
 
             state = state?.Trim('"', ' ', '}', '{');
-            
+
             if (string.IsNullOrEmpty(state))
             {
                 _logger.LogError("No state parameter provided in callback");
@@ -112,10 +112,10 @@ public class AuthController : ControllerBase
             };
 
             _logger.LogInformation("Attempting to authenticate with provider: {Provider}", authRequest.Provider);
-        
+
             var response = await Authenticate(authRequest);
-        
-            _logger.LogInformation("Authentication response: {Response}", 
+
+            _logger.LogInformation("Authentication response: {Response}",
                 response.Result is OkObjectResult ? "Success" : "Failure");
 
             if (response.Result is OkObjectResult okResult)
@@ -128,7 +128,7 @@ public class AuthController : ControllerBase
             // Dodajmy więcej informacji o błędzie
             if (response.Result is BadRequestObjectResult badResult)
             {
-                _logger.LogError("Authentication failed with error: {Error}", 
+                _logger.LogError("Authentication failed with error: {Error}",
                     (badResult.Value as AuthResponse)?.Error ?? "Unknown error");
             }
 
@@ -137,22 +137,31 @@ public class AuthController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Callback error: {Message}", ex.Message);
-            return Content($"<html><body><h1>Error during authentication: {ex.Message}</h1></body></html>", "text/html");
+            return Content($"<html><body><h1>Error during authentication: {ex.Message}</h1></body></html>",
+                "text/html");
         }
     }
-    
+
     [HttpGet("all-tokens")]
     public IActionResult GetAllTokens()
     {
         try
         {
             var tokens = _tokenStorageService.GetAllTokens();
+
+            if (tokens == null || !tokens.Any())
+            {
+                _logger.LogWarning("No tokens found to return.");
+                return Ok(new { message = "No tokens available" });
+            }
+
             _logger.LogInformation("Returning tokens: {Tokens}", JsonSerializer.Serialize(tokens));
-        
+
             foreach (var (key, value) in tokens)
             {
-                _logger.LogDebug("Provider={Provider}, AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
-                    key, value.accessToken, value.refreshToken, value.expiresAt);
+                _logger.LogDebug(
+                    "Provider={Provider}, AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
+                    key, value.AccessToken, value.RefreshToken, value.ExpiresAt);
             }
 
             return Ok(tokens);
@@ -163,6 +172,4 @@ public class AuthController : ControllerBase
             return StatusCode(500, "Internal Server Error");
         }
     }
-
-    
 }
