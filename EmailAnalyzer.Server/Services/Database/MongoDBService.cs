@@ -291,10 +291,10 @@ public class MongoDBService
             // Możemy użyć $vectorSearch jeśli mamy Atlas z obsługą wektorów
             var pipeline = new[]
             {
-                new BsonDocument("$match", filter.Render(
-                    _emails.DocumentSerializer,
-                    _emails.Settings.SerializerRegistry)),
+                // Filter out documents with null or missing embedding
+                new BsonDocument("$match", new BsonDocument("embedding", new BsonDocument("$ne", BsonNull.Value))),
 
+                // Compute similarity
                 new BsonDocument("$addFields", new BsonDocument
                 {
                     {
@@ -307,8 +307,10 @@ public class MongoDBService
                     }
                 }),
 
+                // Sort by similarity
                 new BsonDocument("$sort", new BsonDocument("similarity", -1)),
 
+                // Limit results
                 new BsonDocument("$limit", limit)
             };
 
