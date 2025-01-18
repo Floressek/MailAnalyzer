@@ -38,15 +38,13 @@ public class MongoDBService
 
         try
         {
-            // Setup MongoDB client and database
-            var settings = MongoClientSettings.FromUrl(
-                new MongoUrl(config.Value.ConnectionString)
-            );
-            settings.ServerApi = new ServerApi(ServerApiVersion.V1); // Use API version 1
+            var mongoConnectionUrl = config.Value.ConnectionString;
+            _logger.LogInformation("Initializing MongoDB with connection string: {ConnectionString}", 
+                mongoConnectionUrl.Replace(config.Value.Password, "****"));
 
-            var client = new MongoClient(settings);
-            _database = client.GetDatabase(config.Value.DatabaseName); // Tworzy baze przy pierwszej operacji zapisu NIE TU "lazy" making
-
+            var client = new MongoClient(mongoConnectionUrl);
+            _database = client.GetDatabase(config.Value.DatabaseName);
+            
             _emails = _database.GetCollection<EmailDocument>("emails");
             _summaries = _database.GetCollection<EmailSummaryDocument>("summaries");
 
