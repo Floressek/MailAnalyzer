@@ -299,4 +299,51 @@ public class EmailController : ControllerBase
             });
         }
     }
+    
+    /// <summary>
+    /// This module is used to search for emails based on the provided query.
+    /// </summary>
+    /// <param name="provider"></param>
+    /// <param name="query"></param>
+    /// <param name="startDate"></param>
+    /// <param name="endDate"></param>
+    /// <param name="limit"></param>
+    /// <returns></returns>
+    [HttpGet("{provider}/search")]
+    public async Task<ActionResult<List<EmailDocument>>> SemanticSearch(
+        string provider,
+        [FromQuery] string query,
+        [FromQuery] DateTime? startDate = null,
+        [FromQuery] DateTime? endDate = null,
+        [FromQuery] int limit = 5)
+    {
+        try
+        {
+            _logger.LogInformation(
+                "Semantic search request. Query: {Query}, Provider: {Provider}, DateRange: {StartDate} - {EndDate}",
+                query, provider, startDate, endDate);
+
+            // Generuj embedding dla zapytania
+            var queryEmbedding = await _openAIService.GenerateEmbeddingAsync(query);
+        
+            // Wyszukaj podobne maile
+            var similarEmails = await _mongoDBService.FindSimilarEmailsAsync(
+                queryEmbedding,
+                provider,
+                startDate,
+                endDate,
+                limit);
+
+            _logger.LogInformation("Found {Count} similar emails for query: {Query}", 
+                similarEmails.Count, query);
+        
+            return Ok(similarEmails);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during semantic search");
+            return StatusCode(500, "Error performing semantic search");
+        }
+    }
+    
 }
