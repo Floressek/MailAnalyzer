@@ -29,9 +29,18 @@ public class ServerTokenStorageService : ITokenStorageService
             {
                 var json = File.ReadAllText(_storageFilePath);
                 var tokens = JsonSerializer.Deserialize<Dictionary<string, (string, string, DateTime)>>(json);
-                foreach (var (key, value) in tokens!)
+
+                if (tokens != null)
                 {
-                    _tokens.TryAdd(key, value);
+                    foreach (var (key, value) in tokens)
+                    {
+                        _tokens.TryAdd(key, value);
+                    }
+                    _logger.LogInformation("Tokens successfully loaded from file. Token count: {Count}", tokens.Count);
+                }
+                else
+                {
+                    _logger.LogWarning("No tokens found in file.");
                 }
             }
         }
@@ -40,6 +49,7 @@ public class ServerTokenStorageService : ITokenStorageService
             _logger.LogError(ex, "Failed to load tokens from file");
         }
     }
+
 
     public Task StoreTokenAsync(string provider, string accessToken, string refreshToken, DateTime expiresAt)
     {
@@ -59,9 +69,14 @@ public class ServerTokenStorageService : ITokenStorageService
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_storageFilePath)!);
-            var json = JsonSerializer.Serialize(_tokens);
+
+            // Konwertuj ConcurrentDictionary na Dictionary
+            var serializableTokens = _tokens.ToDictionary(entry => entry.Key, entry => entry.Value);
+            var json = JsonSerializer.Serialize(serializableTokens);
+
             _logger.LogInformation("Serialized token JSON: {Json}", json);
             File.WriteAllText(_storageFilePath, json);
+
             _logger.LogInformation("Token successfully saved to file at {Path}", _storageFilePath);
         }
         catch (Exception ex)
@@ -71,6 +86,7 @@ public class ServerTokenStorageService : ITokenStorageService
 
         return Task.CompletedTask;
     }
+
 
     public Task<(string? accessToken, string? refreshToken, DateTime expiresAt)> GetTokenAsync(string provider)
     {
