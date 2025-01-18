@@ -120,7 +120,7 @@ public class OpenAIService
                     }
                 },
                 temperature = 0.3,
-                max_tokens = 20000
+                max_tokens = 16000
             };
 
             _logger.LogInformation("Sending request to OpenAI with model: {Model}", _config.CompletionModel);
@@ -185,7 +185,7 @@ public class OpenAIService
                 }
             },
             temperature = 0.3,
-            max_tokens = 25000
+            max_tokens = 16000
         };
         
         // Send request to OpenAI API
