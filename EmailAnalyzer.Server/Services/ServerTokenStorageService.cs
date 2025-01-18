@@ -47,24 +47,22 @@ public class ServerTokenStorageService : ITokenStorageService
         _logger.LogDebug("Token details: AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
             accessToken, refreshToken, expiresAt);
 
+        if (string.IsNullOrEmpty(accessToken))
+        {
+            _logger.LogError("AccessToken is null or empty for provider: {Provider}", provider);
+        }
+
         _tokens.AddOrUpdate(provider,
             (accessToken, refreshToken, expiresAt),
             (_, _) => (accessToken, refreshToken, expiresAt));
 
         try
         {
-            // Upewnij się że katalog istnieje
             Directory.CreateDirectory(Path.GetDirectoryName(_storageFilePath)!);
-
-            // Zapisz do pliku
             var json = JsonSerializer.Serialize(_tokens);
+            _logger.LogInformation("Serialized token JSON: {Json}", json);
             File.WriteAllText(_storageFilePath, json);
-
-            _logger.LogInformation("Token successfully saved to file at {Path}. File content: {Content}",
-                _storageFilePath, json);
-            _logger.LogDebug(
-                "Stored token details: AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
-                accessToken, refreshToken, expiresAt);
+            _logger.LogInformation("Token successfully saved to file at {Path}", _storageFilePath);
         }
         catch (Exception ex)
         {
