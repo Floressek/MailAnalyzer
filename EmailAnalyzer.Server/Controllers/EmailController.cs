@@ -343,7 +343,7 @@ public class EmailController : ControllerBase
                     Subject = email.Subject,
                     From = email.From,
                     ReceivedDate = email.ReceivedDate,
-                    Similarity = email.Similarity,
+                    Similarity = email.Similarity ?? 0.0,
                     Content = email.Content
                 }).ToList()
             };
