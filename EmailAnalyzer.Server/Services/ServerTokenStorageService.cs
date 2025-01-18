@@ -41,7 +41,6 @@ public class ServerTokenStorageService : ITokenStorageService
         }
     }
 
-
     public Task StoreTokenAsync(string provider, string accessToken, string refreshToken, DateTime expiresAt)
     {
         _tokens.AddOrUpdate(provider,
@@ -75,6 +74,7 @@ public class ServerTokenStorageService : ITokenStorageService
     {
         if (_tokens.TryGetValue(provider, out var token))
         {
+            _logger.LogInformation("Retrieved token for {Provider}", provider);
             return Task.FromResult<(string?, string?, DateTime)>((token.accessToken, token.refreshToken,
                 token.expiresAt));
         }
