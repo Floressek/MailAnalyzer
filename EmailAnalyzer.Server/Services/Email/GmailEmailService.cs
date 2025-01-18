@@ -101,6 +101,11 @@ public class GmailEmailService : IEmailService
                 authCode,
                 _config.RedirectUri,
                 CancellationToken.None);
+            
+            // Log the token details
+            _logger.LogInformation("AccessToken: {AccessToken}, RefreshToken: {RefreshToken}, ExpiresIn: {ExpiresInSeconds}",
+                token.AccessToken, token.RefreshToken ?? "null", token.ExpiresInSeconds);
+
 
             // Initialize Gmail service
             var credential = GoogleCredential.FromAccessToken(token.AccessToken);
@@ -117,6 +122,7 @@ public class GmailEmailService : IEmailService
             {
                 Success = true,
                 AccessToken = token.AccessToken,
+                RefreshToken = token.RefreshToken,
                 ExpiresAt = DateTime.UtcNow.AddSeconds(token.ExpiresInSeconds ?? 3600)
             };
         }

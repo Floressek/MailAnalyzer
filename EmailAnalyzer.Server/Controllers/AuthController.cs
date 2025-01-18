@@ -49,43 +49,81 @@ public class AuthController : ControllerBase
     [HttpPost("authenticate")]
     public async Task<ActionResult<AuthResponse>> Authenticate([FromBody] AuthRequest request)
     {
+        _logger.LogInformation("Received authentication request for provider: {Provider}", request.Provider);
+
+        if (string.IsNullOrEmpty(request.AuthCode))
+        {
+            _logger.LogWarning("AuthCode is null or empty");
+            return BadRequest("AuthCode is required");
+        }
+        
         try
         {
-            var service = _emailServiceFactory.GetService(request.Provider);
-            var response = await service.AuthenticateAsync(request.AuthCode);
+            var authResponse = await _emailServiceFactory.GetService(request.Provider)
+                .AuthenticateAsync(request.AuthCode);
 
-            if (!response.Success)
+            if (authResponse.Success)
             {
-                return BadRequest(response);
+                _logger.LogInformation("Authentication successful for provider: {Provider}", request.Provider);
+
+                // Store the token
+                await _tokenStorageService.StoreTokenAsync(
+                    request.Provider,
+                    authResponse.AccessToken!,
+                    authResponse.RefreshToken ?? "",
+                    authResponse.ExpiresAt
+                );
+
+                return Ok(new { message = "Authentication successful" });
             }
 
-            // Zapisz token na serwerze
-            await _tokenStorageService.StoreTokenAsync(
-                request.Provider,
-                response.AccessToken!,
-                response.RefreshToken ?? "",
-                response.ExpiresAt
-            );
-
-            // Zwróć token do klienta
-            return Ok(new AuthResponse
-            {
-                Success = true,
-                AccessToken = response.AccessToken,
-                RefreshToken = response.RefreshToken,
-                ExpiresAt = response.ExpiresAt
-            });
+            _logger.LogError("Authentication failed: {Error}", authResponse.Error);
+            return BadRequest(authResponse.Error);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Authentication error for {Provider}", request.Provider);
-            return BadRequest(new AuthResponse
-            {
-                Success = false,
-                Error = "Authentication failed"
-            });
+            _logger.LogError(ex, "Authentication processing failed");
+            return StatusCode(500, "Internal Server Error");
         }
     }
+        
+    //     try
+    //     {
+    //         var service = _emailServiceFactory.GetService(request.Provider);
+    //         var response = await service.AuthenticateAsync(request.AuthCode);
+    //
+    //         if (!response.Success)
+    //         {
+    //             return BadRequest(response);
+    //         }
+    //
+    //         // Zapisz token na serwerze
+    //         await _tokenStorageService.StoreTokenAsync(
+    //             request.Provider,
+    //             response.AccessToken!,
+    //             response.RefreshToken ?? "",
+    //             response.ExpiresAt
+    //         );
+    //
+    //         // Zwróć token do klienta
+    //         return Ok(new AuthResponse
+    //         {
+    //             Success = true,
+    //             AccessToken = response.AccessToken,
+    //             RefreshToken = response.RefreshToken,
+    //             ExpiresAt = response.ExpiresAt
+    //         });
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         _logger.LogError(ex, "Authentication error for {Provider}", request.Provider);
+    //         return BadRequest(new AuthResponse
+    //         {
+    //             Success = false,
+    //             Error = "Authentication failed"
+    //         });
+    //     }
+    // }
 
 
     [Route("~/auth/callback")]

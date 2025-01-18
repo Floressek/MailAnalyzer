@@ -62,14 +62,6 @@ builder.Services.AddControllers();
 var app = builder.Build();
 
 // Development specific middleware
-// if (app.Environment.IsDevelopment())
-// {
-//     app.UseDeveloperExceptionPage();
-//     app.UseSwagger();
-//     app.UseSwaggerUI();
-// }
-
-// Development specific middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();

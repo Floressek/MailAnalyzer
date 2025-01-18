@@ -43,6 +43,10 @@ public class ServerTokenStorageService : ITokenStorageService
 
     public Task StoreTokenAsync(string provider, string accessToken, string refreshToken, DateTime expiresAt)
     {
+        _logger.LogInformation("Storing token for provider: {Provider}", provider);
+        _logger.LogDebug("Token details: AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
+            accessToken, refreshToken, expiresAt);
+
         _tokens.AddOrUpdate(provider,
             (accessToken, refreshToken, expiresAt),
             (_, _) => (accessToken, refreshToken, expiresAt));
