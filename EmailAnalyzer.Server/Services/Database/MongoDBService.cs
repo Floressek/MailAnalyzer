@@ -352,6 +352,21 @@ public class MongoDBService
                 _logger.LogWarning("No emails with embeddings found!");
                 return new List<EmailDocument>();
             }
+            
+            // Better logging
+            _logger.LogInformation(
+                "Pipeline details - QueryEmbedding length: {Length}, First 3 values: [{Values}]", 
+                queryEmbedding.Count,
+                string.Join(", ", queryEmbedding.Take(3)));
+
+            var sampleDoc = await _emails.Find(testFilter).Limit(1).FirstOrDefaultAsync();
+            if (sampleDoc != null)
+            {
+                _logger.LogInformation(
+                    "Sample document - Embedding length: {Length}, First 3 values: [{Values}]",
+                    sampleDoc.Embedding?.Count ?? 0,
+                    sampleDoc.Embedding != null ? string.Join(", ", sampleDoc.Embedding.Take(3)) : "null");
+            }
 
             var filterBuilder = Builders<EmailDocument>.Filter;
             var filters = new List<FilterDefinition<EmailDocument>>
@@ -376,6 +391,26 @@ public class MongoDBService
                     _emails.DocumentSerializer,
                     _emails.Settings.SerializerRegistry)),
 
+                // Najpierw przekonwertujmy embedding na liczby
+                new BsonDocument("$addFields", new BsonDocument
+                {
+                    {
+                        "normalizedEmbedding", new BsonDocument("$map", new BsonDocument
+                        {
+                            { "input", "$embedding" },
+                            { "as", "elem" },
+                            {
+                                "in", new BsonDocument("$convert", new BsonDocument
+                                {
+                                    { "input", "$$elem" },
+                                    { "to", "double" }
+                                })
+                            }
+                        })
+                    }
+                }),
+
+                // Teraz obliczmy similarity używając znormalizowanych wartości
                 new BsonDocument("$addFields", new BsonDocument
                 {
                     {
@@ -383,7 +418,10 @@ public class MongoDBService
                         {
                             new BsonDocument("$reduce", new BsonDocument
                             {
-                                { "input", new BsonDocument("$range", new BsonArray { 0, new BsonArray(queryEmbedding).Count }) },
+                                {
+                                    "input",
+                                    new BsonDocument("$range", new BsonArray { 0, new BsonArray(queryEmbedding).Count })
+                                },
                                 { "initialValue", 0.0 },
                                 {
                                     "in", new BsonDocument("$add", new BsonArray
@@ -391,16 +429,22 @@ public class MongoDBService
                                         "$$value",
                                         new BsonDocument("$multiply", new BsonArray
                                         {
-                                            new BsonDocument("$arrayElemAt", new BsonArray { "$embedding", "$$this" }),
-                                            new BsonDocument("$arrayElemAt", new BsonArray { new BsonArray(queryEmbedding), "$$this" })
+                                            new BsonDocument("$arrayElemAt",
+                                                new BsonArray { "$normalizedEmbedding", "$$this" }),
+                                            new BsonDocument("$arrayElemAt", new BsonArray
+                                            {
+                                                new BsonArray(queryEmbedding.Select(x => (double)x)),
+                                                "$$this"
+                                            })
                                         })
                                     })
                                 }
                             }),
-                            0.0 // Domyślna wartość dla `similarity`, jeśli jest null
+                            0.0
                         })
                     }
                 }),
+
                 new BsonDocument("$sort", new BsonDocument("similarity", -1)),
                 new BsonDocument("$limit", limit)
             };
