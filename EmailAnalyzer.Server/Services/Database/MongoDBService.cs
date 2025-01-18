@@ -385,32 +385,14 @@ public class MongoDBService
 
             _logger.LogInformation("Executing similarity search pipeline");
 
+            var queryEmbeddingArray = new BsonArray(queryEmbedding.Select(x => (double)x));
+
             var pipeline = new[]
             {
                 new BsonDocument("$match", filter.Render(
                     _emails.DocumentSerializer,
                     _emails.Settings.SerializerRegistry)),
 
-                // Najpierw przekonwertujmy embedding na liczby
-                new BsonDocument("$addFields", new BsonDocument
-                {
-                    {
-                        "normalizedEmbedding", new BsonDocument("$map", new BsonDocument
-                        {
-                            { "input", "$embedding" },
-                            { "as", "elem" },
-                            {
-                                "in", new BsonDocument("$convert", new BsonDocument
-                                {
-                                    { "input", "$$elem" },
-                                    { "to", "double" }
-                                })
-                            }
-                        })
-                    }
-                }),
-
-                // Teraz obliczmy similarity używając znormalizowanych wartości
                 new BsonDocument("$addFields", new BsonDocument
                 {
                     {
@@ -418,10 +400,7 @@ public class MongoDBService
                         {
                             new BsonDocument("$reduce", new BsonDocument
                             {
-                                {
-                                    "input",
-                                    new BsonDocument("$range", new BsonArray { 0, new BsonArray(queryEmbedding).Count })
-                                },
+                                { "input", new BsonDocument("$range", new BsonArray { 0, queryEmbedding.Count }) },
                                 { "initialValue", 0.0 },
                                 {
                                     "in", new BsonDocument("$add", new BsonArray
@@ -429,12 +408,15 @@ public class MongoDBService
                                         "$$value",
                                         new BsonDocument("$multiply", new BsonArray
                                         {
-                                            new BsonDocument("$arrayElemAt",
-                                                new BsonArray { "$normalizedEmbedding", "$$this" }),
-                                            new BsonDocument("$arrayElemAt", new BsonArray
+                                            new BsonDocument("$convert", new BsonDocument
                                             {
-                                                new BsonArray(queryEmbedding.Select(x => (double)x)),
-                                                "$$this"
+                                                { "input", new BsonDocument("$arrayElemAt", new BsonArray { "$embedding", "$$this" }) },
+                                                { "to", "double" }
+                                            }),
+                                            new BsonDocument("$arrayElemAt", new BsonArray 
+                                            { 
+                                                queryEmbeddingArray,
+                                                "$$this" 
                                             })
                                         })
                                     })
@@ -444,7 +426,6 @@ public class MongoDBService
                         })
                     }
                 }),
-
                 new BsonDocument("$sort", new BsonDocument("similarity", -1)),
                 new BsonDocument("$limit", limit)
             };
