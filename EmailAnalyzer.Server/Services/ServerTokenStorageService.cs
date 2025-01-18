@@ -28,7 +28,7 @@ public class ServerTokenStorageService : ITokenStorageService
             if (File.Exists(_storageFilePath))
             {
                 var json = File.ReadAllText(_storageFilePath);
-                var tokens = JsonSerializer.Deserialize<Dictionary<string, (string, string, DateTime)>>(json);
+                var tokens = JsonSerializer.Deserialize<Dictionary<string, (string accessToken, string refreshToken, DateTime expiresAt)>>(json);
 
                 if (tokens != null)
                 {
@@ -70,9 +70,18 @@ public class ServerTokenStorageService : ITokenStorageService
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_storageFilePath)!);
 
-            // Konwertuj ConcurrentDictionary na Dictionary
-            var serializableTokens = _tokens.ToDictionary(entry => entry.Key, entry => entry.Value);
-            var json = JsonSerializer.Serialize(serializableTokens);
+        // Konwersja ConcurrentDictionary na Dictionary
+        var serializableTokens = _tokens.ToDictionary(entry => entry.Key, entry => new
+        {
+            entry.Value.accessToken,
+            entry.Value.refreshToken,
+            entry.Value.expiresAt
+        });
+
+        var json = JsonSerializer.Serialize(serializableTokens, new JsonSerializerOptions
+        {
+            WriteIndented = true // Opcjonalnie: dla lepszej czytelności JSON
+        });
 
             _logger.LogInformation("Serialized token JSON: {Json}", json);
             File.WriteAllText(_storageFilePath, json);
