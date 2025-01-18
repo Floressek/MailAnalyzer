@@ -99,35 +99,49 @@ public class OpenAIService
 
     private async Task<string> GenerateSummaryAsync(string content)
     {
-        var request = new
+        try 
         {
-            model = _config.CompletionModel,
-            messages = new[]
+            var request = new
             {
-                new
+                model = _config.CompletionModel,
+                messages = new[]
                 {
-                    role = "system",
-                    content =
-                        "You are an expert at analyzing and summarizing email content. " +
-                        "Provide a concise but comprehensive summary of the key points, patterns, and important " +
-                        "information from the provided emails."
+                    new
+                    {
+                        role = "system",
+                        content = "You are an expert at analyzing and summarizing email content. " +
+                                  "Provide a concise but comprehensive summary of the key points, patterns, and important " +
+                                  "information from the provided emails."
+                    },
+                    new
+                    {
+                        role = "user",
+                        content = $"Please analyze and summarize the following email batch:\n\n{content}"
+                    }
                 },
-                new
-                {
-                    role = "user",
-                    content = $"Please analyze and summarize the following email batch:\n\n{content}"
-                }
-            },
-            temperature = 0.3,
-            max_tokens = 20000
-        };
+                temperature = 0.3,
+                max_tokens = 20000
+            };
 
-        var response = await _httpClient.PostAsJsonAsync("chat/completions", request);
-        response.EnsureSuccessStatusCode();
+            _logger.LogInformation("Sending request to OpenAI with model: {Model}", _config.CompletionModel);
+        
+            var response = await _httpClient.PostAsJsonAsync("chat/completions", request);
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("OpenAI API error: {StatusCode} - {Error}", 
+                    response.StatusCode, errorContent);
+                throw new Exception($"OpenAI API error: {errorContent}");
+            }
 
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        return result.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ??
-               string.Empty;
+            var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+            return result.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to generate summary");
+            throw;
+        }
     }
     
     private async Task<List<float>> GenerateEmbeddingAsync(string text)
