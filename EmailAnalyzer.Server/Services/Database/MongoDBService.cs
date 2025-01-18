@@ -381,10 +381,7 @@ public class MongoDBService
                     {
                         "similarity", new BsonDocument("$reduce", new BsonDocument
                         {
-                            {
-                                "input",
-                                new BsonDocument("$range", new BsonArray { 0, new BsonArray(queryEmbedding).Count })
-                            },
+                            { "input", new BsonDocument("$range", new BsonArray { 0, new BsonArray(queryEmbedding).Count }) },
                             { "initialValue", 0.0 },
                             {
                                 "in", new BsonDocument("$add", new BsonArray
@@ -393,15 +390,13 @@ public class MongoDBService
                                     new BsonDocument("$multiply", new BsonArray
                                     {
                                         new BsonDocument("$arrayElemAt", new BsonArray { "$embedding", "$$this" }),
-                                        new BsonDocument("$arrayElemAt",
-                                            new BsonArray { new BsonArray(queryEmbedding), "$$this" })
+                                        new BsonDocument("$arrayElemAt", new BsonArray { new BsonArray(queryEmbedding), "$$this" })
                                     })
                                 })
                             }
                         })
                     }
                 }),
-
                 new BsonDocument("$sort", new BsonDocument("similarity", -1)),
                 new BsonDocument("$limit", limit)
             };
