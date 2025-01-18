@@ -87,45 +87,6 @@ public class AuthController : ControllerBase
             return StatusCode(500, "Internal Server Error");
         }
     }
-        
-    //     try
-    //     {
-    //         var service = _emailServiceFactory.GetService(request.Provider);
-    //         var response = await service.AuthenticateAsync(request.AuthCode);
-    //
-    //         if (!response.Success)
-    //         {
-    //             return BadRequest(response);
-    //         }
-    //
-    //         // Zapisz token na serwerze
-    //         await _tokenStorageService.StoreTokenAsync(
-    //             request.Provider,
-    //             response.AccessToken!,
-    //             response.RefreshToken ?? "",
-    //             response.ExpiresAt
-    //         );
-    //
-    //         // Zwróć token do klienta
-    //         return Ok(new AuthResponse
-    //         {
-    //             Success = true,
-    //             AccessToken = response.AccessToken,
-    //             RefreshToken = response.RefreshToken,
-    //             ExpiresAt = response.ExpiresAt
-    //         });
-    //     }
-    //     catch (Exception ex)
-    //     {
-    //         _logger.LogError(ex, "Authentication error for {Provider}", request.Provider);
-    //         return BadRequest(new AuthResponse
-    //         {
-    //             Success = false,
-    //             Error = "Authentication failed"
-    //         });
-    //     }
-    // }
-
 
     [Route("~/auth/callback")]
     [HttpGet]
@@ -187,6 +148,13 @@ public class AuthController : ControllerBase
         {
             var tokens = _tokenStorageService.GetAllTokens();
             _logger.LogInformation("Returning tokens: {Tokens}", JsonSerializer.Serialize(tokens));
+        
+            foreach (var (key, value) in tokens)
+            {
+                _logger.LogDebug("Provider={Provider}, AccessToken={AccessToken}, RefreshToken={RefreshToken}, ExpiresAt={ExpiresAt}",
+                    key, value.accessToken, value.refreshToken, value.expiresAt);
+            }
+
             return Ok(tokens);
         }
         catch (Exception ex)
@@ -195,5 +163,6 @@ public class AuthController : ControllerBase
             return StatusCode(500, "Internal Server Error");
         }
     }
+
     
 }
