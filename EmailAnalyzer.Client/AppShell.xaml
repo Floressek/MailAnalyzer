@@ -17,5 +17,10 @@
         Title="Date Selection"
         ContentTemplate="{DataTemplate pages:DateSelectionPage}"
         Route="dateSelection" />
+    
+    <ShellContent
+        Title="Summary"
+        ContentTemplate="{DataTemplate pages:SummaryPage}"
+        Route="summary" />
 
 </Shell>

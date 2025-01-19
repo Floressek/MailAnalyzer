@@ -8,6 +8,8 @@ public partial class AppShell : Shell
 	{
 		InitializeComponent();
 		Console.WriteLine("AppShell constructor called");
-		Routing.RegisterRoute("dateSelection", typeof(DateSelectionPage));
+		// Routing.RegisterRoute("dateSelection", typeof(DateSelectionPage));
+		Routing.RegisterRoute("///dateSelection", typeof(DateSelectionPage));
+		Routing.RegisterRoute("///summary", typeof(SummaryPage));
 	}
 }

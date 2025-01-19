@@ -28,11 +28,15 @@ public partial class DateSelectionPage : ContentPage, IQueryAttributable
 
     public Command AnalyzeCommand { get; }
     
-    public DateSelectionPage(ITokenStorageService tokenStorage)
+    public DateSelectionPage(ITokenStorageService tokenStorage, HttpClient httpClient)
     {
         InitializeComponent();
         _tokenStorage = tokenStorage ?? throw new ArgumentNullException(nameof(tokenStorage));
-        
+        _httpClient = new HttpClient
+        {
+            BaseAddress = new Uri("https://mailanalyzer-production.up.railway.app/")
+        };
+
         StartDate = DateTime.Today.AddMonths(-1);
         EndDate = DateTime.Today;
         MinimumDate = DateTime.Today.AddMonths(-6);
@@ -142,9 +146,46 @@ public partial class DateSelectionPage : ContentPage, IQueryAttributable
     }
 
 
-    /// <summary>
-    /// This method is used to analyze the emails for the selected date range and to navigate to the summary page.
-    /// </summary>
+    // /// <summary>
+    // /// This method is used to analyze the emails for the selected date range and to navigate to the summary page.
+    // /// </summary>
+    // private async Task OnAnalyze()
+    // {
+    //     try
+    //     {
+    //         Console.WriteLine($"DEBUG: Starting analysis for provider {_provider}");
+    //
+    //         await VerifyTokenAndRefreshIfNeeded();
+    //         IsLoading = true;
+    //
+    //         var url = $"api/Email/{_provider}?startDate={StartDate:yyyy-MM-ddTHH:mm:ss}&endDate={EndDate:yyyy-MM-ddTHH:mm:ss}";
+    //         Console.WriteLine($"DEBUG: Sending request to {url}");
+    //
+    //         var response = await _httpClient.PostAsync(url, new StringContent(""));
+    //         if (response.IsSuccessStatusCode)
+    //         {
+    //             var emails = await response.Content.ReadFromJsonAsync<List<EmailMessage>>();
+    //             Console.WriteLine($"DEBUG: Found {emails?.Count ?? 0} emails");
+    //             await DisplayAlert("Success", $"Found {emails?.Count ?? 0} emails", "OK");
+    //         }
+    //         else
+    //         {
+    //             var error = await response.Content.ReadAsStringAsync();
+    //             Console.WriteLine($"DEBUG: Error response: {error}");
+    //             await DisplayAlert("Error", $"Failed to analyze emails: {error}", "OK");
+    //         }
+    //     }
+    //     catch (Exception ex)
+    //     {
+    //         Console.WriteLine($"DEBUG: Analysis failed: {ex.Message}");
+    //         await DisplayAlert("Error", $"An error occurred: {ex.Message}", "OK");
+    //     }
+    //     finally
+    //     {
+    //         IsLoading = false;
+    //     }
+    // }
+    
     private async Task OnAnalyze()
     {
         try
@@ -162,7 +203,23 @@ public partial class DateSelectionPage : ContentPage, IQueryAttributable
             {
                 var emails = await response.Content.ReadFromJsonAsync<List<EmailMessage>>();
                 Console.WriteLine($"DEBUG: Found {emails?.Count ?? 0} emails");
-                await DisplayAlert("Success", $"Found {emails?.Count ?? 0} emails", "OK");
+            
+                if (emails != null && emails.Any())
+                {
+                    // Przechodzimy do strony podsumowania z parametrami
+                    var parameters = new Dictionary<string, object>
+                    {
+                        { "provider", _provider },
+                        { "startDate", StartDate.ToString("o") },
+                        { "endDate", EndDate.ToString("o") }
+                    };
+
+                    await Shell.Current.GoToAsync("///summary", parameters);
+                }
+                else
+                {
+                    await DisplayAlert("Info", "No emails found in selected date range", "OK");
+                }
             }
             else
             {
