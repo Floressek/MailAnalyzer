@@ -1,38 +1,38 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-	<application
-			android:allowBackup="true"
-			android:supportsRtl="true">
-		<activity android:name="microsoft.identity.client.BrowserTabActivity"
-				  android:exported="true">
-			<intent-filter>
-				<action android:name="android.intent.action.VIEW" />
-				<category android:name="android.intent.category.DEFAULT" />
-				<category android:name="android.intent.category.BROWSABLE" />
-				<data
-						android:scheme="https"
-						android:host="mailanalyzer-production.up.railway.app"
-						android:pathPrefix="/auth/callback" />
-			</intent-filter>
-		</activity>
-	</application>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="mailanalyzer">
+    <application
+            android:allowBackup="true"
+            android:supportsRtl="true">
+        <activity android:name="microsoft.identity.client.BrowserTabActivity"
+                  android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                        android:scheme="https"
+                        android:host="mailanalyzer-production.up.railway.app"
+                        android:pathPrefix="/auth/callback"/>
+            </intent-filter>
+        </activity>
+    </application>
 
-	<!-- Uprawnienia sieciowe -->
-	<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-	<uses-permission android:name="android.permission.INTERNET" />
-	<uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- Uprawnienia sieciowe -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
 
-	<!-- Dodatkowe uprawnienia dla autoryzacji -->
-	<queries>
-		<intent>
-			<action android:name="android.intent.action.VIEW" />
-			<category android:name="android.intent.category.BROWSABLE" />
-			<data android:scheme="https" />
-		</intent>
-		<intent>
-			<action android:name="android.intent.action.VIEW" />
-			<category android:name="android.intent.category.APP_BROWSER" />
-			<data android:scheme="https" />
-		</intent>
-	</queries>
+    <!-- Dodatkowe uprawnienia dla autoryzacji -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <category android:name="android.intent.category.BROWSABLE"/>
+            <data android:scheme="https"/>
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <category android:name="android.intent.category.APP_BROWSER"/>
+            <data android:scheme="https"/>
+        </intent>
+    </queries>
 </manifest>
