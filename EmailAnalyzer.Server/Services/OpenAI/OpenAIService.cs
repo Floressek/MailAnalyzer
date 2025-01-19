@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using Azure;
 using EmailAnalyzer.Shared.Models.Email;
 using Microsoft.Extensions.Options;
 
@@ -99,7 +100,7 @@ public class OpenAIService
 
     private async Task<string> GenerateSummaryAsync(string content)
     {
-        try 
+        try
         {
             var request = new
             {
@@ -124,12 +125,12 @@ public class OpenAIService
             };
 
             _logger.LogInformation("Sending request to OpenAI with model: {Model}", _config.CompletionModel);
-        
+
             var response = await _httpClient.PostAsJsonAsync("chat/completions", request);
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError("OpenAI API error: {StatusCode} - {Error}", 
+                _logger.LogError("OpenAI API error: {StatusCode} - {Error}",
                     response.StatusCode, errorContent);
                 throw new Exception($"OpenAI API error: {errorContent}");
             }
@@ -143,7 +144,7 @@ public class OpenAIService
             throw;
         }
     }
-    
+
     public async Task<List<float>> GenerateEmbeddingAsync(string text)
     {
         var request = new
@@ -155,15 +156,15 @@ public class OpenAIService
         // Send request to OpenAI API
         var response = await _httpClient.PostAsJsonAsync("embeddings", request);
         response.EnsureSuccessStatusCode();
-        
+
         // Parse response
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         var embedding = result.GetProperty("data")[0].GetProperty("embedding");
-        
+
         // Deserialize embedding
         return JsonSerializer.Deserialize<List<float>>(embedding) ?? new List<float>();
     }
-    
+
     private async Task<string> GenerateFinalSummaryAsync(List<string> batchSummaries)
     {
         var summariesContent = string.Join("\n\n", batchSummaries);
@@ -188,13 +189,56 @@ public class OpenAIService
             temperature = 0.3,
             max_tokens = 16000
         };
-        
+
         // Send request to OpenAI API
         var response = await _httpClient.PostAsJsonAsync("chat/completions", request);
         response.EnsureSuccessStatusCode();
-        
+
         // Parse response
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         return result.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
+    }
+
+    /// <summary>
+    /// This method generates a completion for the provided prompt using the configured completion model.
+    /// </summary>
+    /// <param name="prompt"></param>
+    /// <returns></returns>
+    public async Task<string> GetCompletionModelAsync(string prompt)
+    {
+        try
+        {
+            var request = new
+            {
+                model = _config.CompletionModel,
+                messages = new[]
+                {
+                    new
+                    {
+                        role = "system",
+                        content = "You are an expert at generating text completions. " +
+                                  "Provide a completion for the following prompt."
+                    },
+                    new
+                    {
+                        role = "user",
+                        content = prompt
+                    }
+                },
+                temperature = 0.3,
+                max_tokens = 16000
+            };
+
+            var response = await _httpClient.PostAsJsonAsync("chat/completions", request);
+            response.EnsureSuccessStatusCode();
+
+            var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+            return result.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? "";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get completion from OpenAI");
+            throw;
+        }
     }
 }

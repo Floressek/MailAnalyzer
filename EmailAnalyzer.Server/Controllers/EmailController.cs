@@ -324,6 +324,8 @@ public class EmailController : ControllerBase
                 "Semantic search request. Query: {Query}, Provider: {Provider}",
                 query, provider);
 
+
+            // 1. Najpierw znajdujemy podobne emailen na podstawie zapytania
             var queryEmbedding = await _openAIService.GenerateEmbeddingAsync(query);
             var similarEmails = await _mongoDBService.FindSimilarEmailsAsync(
                 queryEmbedding,
@@ -333,7 +335,25 @@ public class EmailController : ControllerBase
                 endDate,
                 limit);
 
-            // Dodajemy więcej kontekstu do odpowiedzi
+            // 2. Dodajemy prompt dla czatu
+            var prompt = $"Analyze these search results for query: '{query}'. " +
+                         "For these emails found in semantic search:\n\n";
+
+            foreach (var email in similarEmails)
+            {
+                prompt += $"Subject: {email.Subject}\n" +
+                          $"From: {email.From}\n" +
+                          $"Similarity Score: {email.Similarity:P2}\n" +
+                          $"Content: {email.Content}\n\n";
+            }
+            
+            prompt += "\nProvide a concise analysis of how these results relate to the user's query. " +
+                      "Focus on the most relevant findings and patterns, considering the similarity scores.";
+            
+            // 3. Użyj OpenAI do analizy danych z czatu
+            var analysis = await _openAIService.GetCompletionModelAsync(prompt);
+
+            // Dodajemy więcej kontekstu do odpowiedzi + analiza
             var result = new SearchResult
             {
                 Query = query,
@@ -345,7 +365,8 @@ public class EmailController : ControllerBase
                     ReceivedDate = email.ReceivedDate,
                     Similarity = email.Similarity ?? 0.0,
                     Content = email.Content
-                }).ToList()
+                }).ToList(),
+                Analysis = analysis
             };
 
             return Ok(result);
@@ -363,6 +384,7 @@ public class EmailController : ControllerBase
         public string Query { get; set; } = string.Empty;
         public int TotalResults { get; set; }
         public List<SearchResultItem> Results { get; set; } = new();
+        public string Analysis { get; set; } = string.Empty; // pole do analizy danych z czatu
     }
 
     public class SearchResultItem
