@@ -73,4 +73,8 @@
 	  <ProjectReference Include="..\EmailAnalyzer.Shared\EmailAnalyzer.Shared.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <Folder Include="ViewModels\" />
+	</ItemGroup>
+
 </Project>

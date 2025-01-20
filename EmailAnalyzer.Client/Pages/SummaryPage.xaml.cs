@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using System.Net.Http.Json;
 using System.Text;
@@ -37,11 +38,7 @@ public partial class SummaryPage : ContentPage, IQueryAttributable
         // Initialize commands
         ExportCommand = new Command(async () => await OnExportPdfAsync());
         NewAnalysisCommand = new Command(async () => await OnNewAnalysisAsync());
-
-        // We won't rely on a separate "RefreshCommand" or "BackCommand" in the new layout,
-        // but you could keep them if you want. For example:
-        // BackCommand = new Command(async () => await Shell.Current.GoToAsync(".."));
-        // RefreshCommand = new Command(async () => await LoadSummary());
+        SearchCommand = new Command(async () => await OnSearchAsync());
 
         // Set BindingContext to THIS code-behind
         BindingContext = this;
@@ -53,6 +50,7 @@ public partial class SummaryPage : ContentPage, IQueryAttributable
 
     // Title for the analysis, e.g., “Connected to Gmail”
     private string _analysisTitle = string.Empty;
+
     public string AnalysisTitle
     {
         get => _analysisTitle;
@@ -68,6 +66,7 @@ public partial class SummaryPage : ContentPage, IQueryAttributable
 
     // Date range display string (e.g., “Analysis Period: 1/1/2023 - 1/15/2023”)
     private string _dateRange = string.Empty;
+
     public string DateRange
     {
         get => _dateRange;
@@ -83,6 +82,7 @@ public partial class SummaryPage : ContentPage, IQueryAttributable
 
     // “Analyzing” indicator for the progress frame
     private bool _isAnalyzing;
+
     public bool IsAnalyzing
     {
         get => _isAnalyzing;
@@ -98,6 +98,7 @@ public partial class SummaryPage : ContentPage, IQueryAttributable
 
     // Progress bar status text
     private string _progressStatus = string.Empty;
+
     public string ProgressStatus
     {
         get => _progressStatus;
@@ -113,6 +114,7 @@ public partial class SummaryPage : ContentPage, IQueryAttributable
 
     // Progress from 0.0 to 1.0
     private double _analysisProgress;
+
     public double AnalysisProgress
     {
         get => _analysisProgress;
@@ -131,6 +133,7 @@ public partial class SummaryPage : ContentPage, IQueryAttributable
 
     // The final summary of the emails
     private string _summary = string.Empty;
+
     public string Summary
     {
         get => _summary;
@@ -146,6 +149,27 @@ public partial class SummaryPage : ContentPage, IQueryAttributable
         }
     }
 
+    // Search query for filtering the KeyInsights
+    private string _searchQuery = string.Empty;
+
+    public ObservableCollection<EmailDocument> SearchResults { get; } = new();
+
+    // Dodaj nową komendę w konstruktorze
+    public ICommand SearchCommand { get; }
+
+    public string SearchQuery
+    {
+        get => _searchQuery;
+        set
+        {
+            if (_searchQuery != value)
+            {
+                _searchQuery = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
     // We can auto-map TopicClusters → KeyInsights for the UI
     public List<TopicCluster> TopicClusters { get; set; } = new();
 
@@ -153,9 +177,9 @@ public partial class SummaryPage : ContentPage, IQueryAttributable
     {
         get
         {
-            if (TopicClusters == null || !TopicClusters.Any()) 
+            if (TopicClusters == null || !TopicClusters.Any())
                 return new List<string>();
-            
+
             // For demonstration, we convert each cluster to a single line string
             return TopicClusters.Select(tc => $"{tc.Topic} — Emails in topic: {tc.Count}").ToList();
         }
@@ -164,6 +188,7 @@ public partial class SummaryPage : ContentPage, IQueryAttributable
     // If you still want to keep an error property:
     public bool HasError => !string.IsNullOrEmpty(ErrorMessage);
     private string _errorMessage = string.Empty;
+
     public string ErrorMessage
     {
         get => _errorMessage;
@@ -224,7 +249,7 @@ public partial class SummaryPage : ContentPage, IQueryAttributable
             ErrorMessage = string.Empty;
 
             // Simulate partial progress update
-            await Task.Delay(500); 
+            await Task.Delay(500);
             ProgressStatus = "Analyzing email content...";
             AnalysisProgress = 0.5;
 
@@ -246,13 +271,13 @@ public partial class SummaryPage : ContentPage, IQueryAttributable
                 Summary = result.FinalSummary;
 
                 TopicClusters = result.BatchSummaries
-                    .Select(b => new TopicCluster 
-                    { 
-                        Topic = b.Summary, 
-                        Count = b.EmailCount 
+                    .Select(b => new TopicCluster
+                    {
+                        Topic = b.Summary,
+                        Count = b.EmailCount
                     })
                     .ToList();
-                
+
                 // Fire property change for KeyInsights (derived from TopicClusters)
                 OnPropertyChanged(nameof(KeyInsights));
             }
@@ -277,8 +302,80 @@ public partial class SummaryPage : ContentPage, IQueryAttributable
             await DisplayAlert("Export", "No analysis results to export.", "OK");
             return;
         }
+
         // Insert real export logic here. For now, just show an alert
         await DisplayAlert("Export", "PDF export would happen here.", "OK");
+    }
+
+    private async Task OnSearchAsync()
+    {
+        if (string.IsNullOrWhiteSpace(SearchQuery))
+            return;
+
+        try
+        {
+            IsAnalyzing = true;
+            SearchResults.Clear();
+
+            var response = await _httpClient.GetAsync(
+                $"api/email/{_provider}/search?query={Uri.EscapeDataString(SearchQuery)}&startDate={_startDate:yyyy-MM-dd}&endDate={_endDate:yyyy-MM-dd}");
+
+            if (response.IsSuccessStatusCode)
+            {
+                var searchResult = await response.Content.ReadFromJsonAsync<SearchResult>();
+                if (searchResult?.Results != null)
+                {
+                    foreach (var result in searchResult.Results)
+                    {
+                        SearchResults.Add(new EmailDocument
+                        {
+                            Subject = result.Subject,
+                            From = result.From,
+                            Content = result.Content,
+                            ReceivedDate = result.ReceivedDate,
+                            Similarity = result.Similarity
+                        });
+                    }
+
+                    // Pokaż analizę w osobnym alercie
+                    if (!string.IsNullOrEmpty(searchResult.Analysis))
+                    {
+                        await DisplayAlert("AI Analysis", searchResult.Analysis, "OK");
+                    }
+                }
+            }
+            else
+            {
+                var error = await response.Content.ReadAsStringAsync();
+                await DisplayAlert("Search Error", error, "OK");
+            }
+        }
+        catch (Exception ex)
+        {
+            await DisplayAlert("Error", $"Search failed: {ex.Message}", "OK");
+        }
+        finally
+        {
+            IsAnalyzing = false;
+        }
+    }
+
+// Model dla odpowiedzi z API
+    public class SearchResult
+    {
+        public string Query { get; set; } = string.Empty;
+        public int TotalResults { get; set; }
+        public List<SearchResultItem> Results { get; set; } = new();
+        public string Analysis { get; set; } = string.Empty;
+    }
+
+    public class SearchResultItem
+    {
+        public string Subject { get; set; } = string.Empty;
+        public string From { get; set; } = string.Empty;
+        public DateTime ReceivedDate { get; set; }
+        public double Similarity { get; set; }
+        public string Content { get; set; } = string.Empty;
     }
 
     private async Task OnNewAnalysisAsync()

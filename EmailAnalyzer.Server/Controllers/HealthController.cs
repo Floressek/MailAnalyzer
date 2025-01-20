@@ -3,6 +3,13 @@ using EmailAnalyzer.Server.Services.Database;
 
 namespace EmailAnalyzer.Server.Controllers;
 
+/// <summary>
+/// Controller for health monitoring and diagnostics.
+/// </summary>
+/// <remarks>
+/// PL: Kontroler do monitorowania stanu i diagnostyki aplikacji.
+/// Używany do sprawdzania stanu usługi i połączeń.
+/// </remarks>
 [ApiController]
 [Route("api/[controller]")]
 public class HealthController : ControllerBase
@@ -18,6 +25,13 @@ public class HealthController : ControllerBase
         _mongoDBService = mongoDBService;
     }
 
+    /// <summary>
+    /// Gets the general health status of the application.
+    /// </summary>
+    /// <remarks>
+    /// PL: Pobiera ogólny status zdrowia aplikacji.
+    /// Używane w: Monitorowaniu stanu usługi na Railway.
+    /// </remarks>
     [HttpGet]
     public IActionResult Get()
     {
@@ -35,6 +49,13 @@ public class HealthController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Checks MongoDB connection health.
+    /// </summary>
+    /// <remarks>
+    /// PL: Sprawdza stan połączenia z MongoDB.
+    /// Używane w: Monitorowaniu stanu bazy danych na Railway.
+    /// </remarks>
     [HttpGet("mongo")]
     public async Task<ActionResult> CheckMongo()
     {

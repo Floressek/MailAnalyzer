@@ -1,8 +1,10 @@
+using System.Reflection;
 using EmailAnalyzer.Server.Services;
 using EmailAnalyzer.Server.Services.Database;
 using EmailAnalyzer.Server.Services.Email;
 using EmailAnalyzer.Server.Services.OpenAI;
 using EmailAnalyzer.Shared.Services;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,9 +20,39 @@ if (!builder.Environment.IsDevelopment())
     });
 }
 
-// Add Swagger
+// Add Swagger with documentation
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Email Analyzer API",
+        Version = "v1",
+        Description = @"API for Email Analyzer application allowing for email analysis and semantic search.
+
+PL: API do aplikacji Email Analyzer umożliwiające analizę maili i wyszukiwanie semantyczne.
+
+Main features / Główne funkcjonalności:
+- OAuth2 authentication with Gmail and Outlook / Uwierzytelnianie OAuth2 z Gmail i Outlook
+- Email fetching and analysis / Pobieranie i analiza maili
+- AI-powered semantic search / Wyszukiwanie semantyczne wspierane przez AI
+- Email summaries and insights / Podsumowania i wnioski z maili",
+        Contact = new OpenApiContact
+        {
+            Name = "API Support",
+            Email = "support@emailanalyzer.com"
+        }
+    });
+    // Documentation XML file
+    var xmlFIle = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFIle); // xml path to the base directory
+    c.IncludeXmlComments(xmlPath);
+});
+
+// Enable XML documentation
+builder.Services.AddControllers()
+    .AddJsonOptions(options => { options.JsonSerializerOptions.WriteIndented = true; })
+    .AddXmlSerializerFormatters();
 
 // Logging configuration
 builder.Logging.ClearProviders();
@@ -71,6 +103,7 @@ builder.Services.AddCors(options =>
 });
 
 builder.Services.AddControllers();
+
 
 var app = builder.Build();
 

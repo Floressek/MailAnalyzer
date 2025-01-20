@@ -8,8 +8,12 @@ using EmailAnalyzer.Server.Services.Email;
 namespace EmailAnalyzer.Server.Controllers;
 
 /// <summary>
-/// This controller is responsible for handling the authentication process.
+/// Controller handling authentication and token management.
 /// </summary>
+/// <remarks>
+/// PL: Kontroler obsługujący uwierzytelnianie i zarządzanie tokenami.
+/// Odpowiada za proces logowania i autoryzacji z dostawcami poczty.
+/// </remarks>
 [ApiController]
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
@@ -28,6 +32,13 @@ public class AuthController : ControllerBase
         _logger = logger;
     }
 
+    /// <summary>
+    /// Gets the authorization URL for the specified provider.
+    /// </summary>
+    /// <remarks>
+    /// PL: Pobiera URL autoryzacji dla wybranego dostawcy.
+    /// Używane w: LoginPage do rozpoczęcia procesu logowania.
+    /// </remarks>
     [HttpGet("url/{provider}")]
     public async Task<IActionResult> GetAuthUrl(string provider)
     {
@@ -47,6 +58,13 @@ public class AuthController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Handles the authentication process with the provider.
+    /// </summary>
+    /// <remarks>
+    /// PL: Obsługuje proces uwierzytelniania z dostawcą.
+    /// Używane w: Procesie OAuth po otrzymaniu kodu autoryzacji.
+    /// </remarks>
     [HttpPost("authenticate")]
     public async Task<ActionResult<AuthResponse>> Authenticate([FromBody] AuthRequest request)
     {
@@ -88,9 +106,16 @@ public class AuthController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Handles OAuth callback from providers.
+    /// </summary>
+    /// <remarks>
+    /// PL: Obsługuje callback OAuth od dostawców.
+    /// Używane w: Procesie OAuth jako endpoint przekierowania.
+    /// </remarks>
     [Route("~/auth/callback")]
     [HttpGet]
-    public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string state)
+    public async Task<IActionResult> Callback([FromQuery] string code, [FromQuery] string state) // ~auth/callback tylda oznacza, że to jest endpoint główny
     {
         try
         {
@@ -142,6 +167,13 @@ public class AuthController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves all stored authentication tokens.
+    /// </summary>
+    /// <remarks>
+    /// PL: Pobiera wszystkie przechowywane tokeny uwierzytelniania.
+    /// Używane w: Diagnostyce i zarządzaniu sesjami.
+    /// </remarks>
     [HttpGet("all-tokens")]
     public IActionResult GetAllTokens()
     {
@@ -173,6 +205,13 @@ public class AuthController : ControllerBase
         }
     }
     
+    /// <summary>
+    /// Removes authentication token for specified provider.
+    /// </summary>
+    /// <remarks>
+    /// PL: Usuwa token uwierzytelniania dla wybranego dostawcy.
+    /// Używane w: Procesie wylogowania i zarządzaniu sesjami.
+    /// </remarks>
     [HttpDelete("remove-token/{provider}")]
     public async Task<IActionResult> RemoveToken(string provider)
     {

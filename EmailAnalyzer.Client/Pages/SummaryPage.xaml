@@ -5,16 +5,10 @@
     x:Class="EmailAnalyzer.Client.Pages.SummaryPage"
     Title="Email Analysis">
 
-    <Grid RowDefinitions="Auto,*,Auto" 
+    <Grid RowDefinitions="Auto,*,Auto,Auto" 
           Padding="20"
           RowSpacing="20">
         
-        <!-- 
-            1) Header (AnalysisTitle, DateRange) 
-            2) Main content (ScrollView) 
-            3) Bottom buttons (Export, NewAnalysis)
-         -->
-
         <!-- Header section -->
         <VerticalStackLayout Grid.Row="0" Spacing="10">
             <Label Text="{Binding AnalysisTitle}" 
@@ -89,6 +83,72 @@
             <Button Text="New Analysis"
                     Command="{Binding NewAnalysisCommand}" />
         </HorizontalStackLayout>
-    </Grid>
 
+        <!-- Chat/Search section -->
+        <Frame Grid.Row="3" 
+               BorderColor="LightGray" 
+               Padding="10">
+            <Grid RowDefinitions="Auto,*" 
+                  ColumnDefinitions="*,Auto">
+                
+                <!-- Search input and button -->
+                <Entry Grid.Row="0" 
+                       Grid.Column="0"
+                       Placeholder="Search in your emails..."
+                       Text="{Binding SearchQuery}"
+                       ReturnCommand="{Binding SearchCommand}"/>
+                
+                <Button Grid.Row="0" 
+                        Grid.Column="1"
+                        Text="Search"
+                        Command="{Binding SearchCommand}"
+                        Margin="10,0,0,0"/>
+
+                <!-- Search results -->
+                <CollectionView Grid.Row="1" 
+                              Grid.ColumnSpan="2"
+                              ItemsSource="{Binding SearchResults}"
+                              HeightRequest="300"
+                              Margin="0,10,0,0">
+                    <CollectionView.EmptyView>
+                        <VerticalStackLayout HorizontalOptions="Center" 
+                                           VerticalOptions="Center">
+                            <Label Text="No results found"
+                                   TextColor="Gray"
+                                   HorizontalOptions="Center"/>
+                        </VerticalStackLayout>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Frame Margin="0,5" 
+                                   Padding="10"
+                                   BorderColor="LightGray">
+                                <Grid RowDefinitions="Auto,Auto,Auto"
+                                      ColumnDefinitions="*,Auto">
+                                    <Label Grid.Row="0" 
+                                           Grid.ColumnSpan="2"
+                                           Text="{Binding Subject}"
+                                           FontAttributes="Bold"/>
+                                    <Label Grid.Row="1" 
+                                           Grid.Column="0"
+                                           Text="{Binding From}"
+                                           FontSize="Small"/>
+                                    <Label Grid.Row="1" 
+                                           Grid.Column="1"
+                                           Text="{Binding Similarity, StringFormat='Match: {0:P0}'}"
+                                           FontSize="Small"/>
+                                    <Label Grid.Row="2" 
+                                           Grid.ColumnSpan="2"
+                                           Text="{Binding Content}"
+                                           LineBreakMode="TailTruncation"
+                                           MaxLines="2"
+                                           FontSize="Small"/>
+                                </Grid>
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </Frame>
+    </Grid>
 </ContentPage>

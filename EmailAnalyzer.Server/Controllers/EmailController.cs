@@ -12,6 +12,13 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace EmailAnalyzer.Server.Controllers;
 
+/// <summary>
+/// Controller handling email operations and analysis.
+/// </summary>
+/// <remarks>
+/// PL: Kontroler obsługujący operacje na mailach i ich analizę.
+/// Używany w głównych funkcjonalnościach aplikacji do pobierania, analizowania i przeszukiwania maili.
+/// </remarks>
 [ApiController]
 [Route("api/[controller]")]
 public class EmailController : ControllerBase
@@ -40,10 +47,13 @@ public class EmailController : ControllerBase
     }
 
     /// <summary>
-    /// This module is used to test the connection to the specified provider.
+    /// Tests the connection to the specified email provider.
     /// </summary>
-    /// <param name="provider"></param>
-    /// <returns></returns>
+    /// <remarks>
+    /// PL: Testuje połączenie z wybranym dostawcą poczty.
+    /// Używane w: Procesie uwierzytelniania do weryfikacji poprawności tokenu.
+    /// </remarks>
+    /// <param name="provider">Email provider (gmail/outlook)</param>
     [HttpGet("test/{provider}")]
     public async Task<IActionResult> TestConnection(string provider)
     {
@@ -62,12 +72,15 @@ public class EmailController : ControllerBase
     }
 
     /// <summary>
-    /// Get emails from the specified provider between the specified dates.
+    /// Retrieves emails from the provider for the specified date range.
     /// </summary>
-    /// <param name="provider"></param>
-    /// <param name="startDate"></param>
-    /// <param name="endDate"></param>
-    /// <returns></returns>
+    /// <remarks>
+    /// PL: Pobiera maile od dostawcy dla określonego zakresu dat.
+    /// Używane w: DateSelectionPage podczas analizy maili z wybranego okresu.
+    /// </remarks>
+    /// <param name="provider">Email provider (gmail/outlook)</param>
+    /// <param name="startDate">Start date of the range</param>
+    /// <param name="endDate">End date of the range</param>
     [HttpPost("{provider}")]
     public async Task<ActionResult<List<EmailMessage>>> GetEmails(
         string provider,
@@ -114,10 +127,12 @@ public class EmailController : ControllerBase
     }
 
     /// <summary>
-    /// This module is used to get the available date range for the specified provider.
+    /// Gets the available date range for email fetching.
     /// </summary>
-    /// <param name="provider"></param>
-    /// <returns></returns>
+    /// <remarks>
+    /// PL: Pobiera dostępny zakres dat dla pobierania maili.
+    /// Używane w: DateSelectionPage do ustawienia limitów wyboru dat.
+    /// </remarks>
     [HttpGet("available-range/{provider}")]
     public async Task<ActionResult<DateRangeInfo>> GetAvailableDateRange(string provider)
     {
@@ -151,6 +166,13 @@ public class EmailController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Analyzes emails for the specified date range using AI.
+    /// </summary>
+    /// <remarks>
+    /// PL: Analizuje maile z wybranego okresu używając AI.
+    /// Używane w: SummaryPage do generowania podsumowania i analizy maili.
+    /// </remarks>
     [HttpPost("{provider}/analyze")]
     public async Task<ActionResult<EmailSummaryResult>> AnalyzeEmails(
         string provider,
@@ -204,6 +226,13 @@ public class EmailController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Retrieves email summaries for the specified date range.
+    /// </summary>
+    /// <remarks>
+    /// PL: Pobiera podsumowania maili dla określonego zakresu dat.
+    /// Używane w: SummaryPage do wyświetlania historycznych analiz.
+    /// </remarks>
     [HttpGet("{provider}/summaries")]
     public async Task<ActionResult<List<EmailSummaryResult>>> GetSummaries(
         string provider,
@@ -274,9 +303,12 @@ public class EmailController : ControllerBase
     }
 
     /// <summary>
-    /// Heltcheck for the MongoDB connection.
+    /// Checks MongoDB connection status.
     /// </summary>
-    /// <returns></returns>
+    /// <remarks>
+    /// PL: Sprawdza status połączenia z bazą MongoDB.
+    /// Używane w: Diagnostyce i monitorowaniu stanu aplikacji.
+    /// </remarks>
     [HttpGet("mongo")]
     public async Task<IActionResult> CheckMongo()
     {
@@ -302,8 +334,13 @@ public class EmailController : ControllerBase
     }
 
     /// <summary>
-    /// This module is used to search for emails based on the provided query.
+    /// Performs semantic search on emails with AI analysis.
     /// </summary>
+    /// <remarks>
+    /// PL: Wykonuje semantyczne przeszukiwanie maili z analizą AI.
+    /// Używane w: SummaryPage w sekcji wyszukiwania, gdzie użytkownik może przeszukiwać
+    /// swoje maile i otrzymać analizę AI znalezionych wyników.
+    /// </remarks>
     /// <param name="provider"></param>
     /// <param name="query"></param>
     /// <param name="startDate"></param>
