@@ -21,6 +21,9 @@ public class ServerTokenStorageService : ITokenStorageService
         LoadTokens();
     }
 
+    /// <summary>
+    /// This method ensures that the storage path exists.
+    /// </summary>
     private void EnsureStoragePathExists()
     {
         try
@@ -33,6 +36,9 @@ public class ServerTokenStorageService : ITokenStorageService
         }
     }
 
+    /// <summary>
+    /// This method loads tokens from the storage file.
+    /// </summary>
     private void LoadTokens()
     {
         try
@@ -77,6 +83,13 @@ public class ServerTokenStorageService : ITokenStorageService
 
 
 
+    /// <summary>
+    /// This method stores the token in the storage.
+    /// </summary>
+    /// <param name="provider"></param>
+    /// <param name="accessToken"></param>
+    /// <param name="refreshToken"></param>
+    /// <param name="expiresAt"></param>
     public async Task StoreTokenAsync(string provider, string accessToken, string refreshToken, DateTime expiresAt)
     {
         _tokens.AddOrUpdate(provider,
@@ -102,6 +115,11 @@ public class ServerTokenStorageService : ITokenStorageService
     }
 
 
+    /// <summary>
+    /// This method retrieves the token from the storage.
+    /// </summary>
+    /// <param name="provider"></param>
+    /// <returns></returns>
     public Task<(string? accessToken, string? refreshToken, DateTime expiresAt)> GetTokenAsync(string provider)
     {
         if (_tokens.TryGetValue(provider, out var token))
@@ -118,14 +136,22 @@ public class ServerTokenStorageService : ITokenStorageService
         return Task.FromResult<(string?, string?, DateTime)>((null, null, DateTime.MinValue));
     }
 
-
+    /// <summary>
+    /// This method removes the token from the storage.
+    /// </summary>
+    /// <param name="provider"></param>
+    /// <returns></returns>
     public Task RemoveTokenAsync(string provider)
     {
-        _tokens.TryRemove(provider, out _);
+        _tokens.TryRemove(provider, out _); // out _ is used to discard the value
         _logger.LogInformation("Tokens removed for {Provider}", provider);
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// This method retrieves all tokens from the storage.
+    /// </summary>
+    /// <returns></returns>
     public Dictionary<string, TokenData> GetAllTokens()
     {
         _logger.LogInformation("Fetching all tokens. Current tokens count: {Count}", _tokens.Count);
