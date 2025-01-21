@@ -1,77 +1,141 @@
+using System.Reflection;
 using EmailAnalyzer.Server.Services;
+using EmailAnalyzer.Server.Services.Database;
 using EmailAnalyzer.Server.Services.Email;
+using EmailAnalyzer.Server.Services.OpenAI;
 using EmailAnalyzer.Shared.Services;
+using Microsoft.OpenApi.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.WebHost.ConfigureKestrel(serverOptions =>
+// Keep the Kestrel configuration for production (Railway)
+if (!builder.Environment.IsDevelopment())
 {
-    var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-    serverOptions.ListenAnyIP(int.Parse(port));
+    builder.WebHost.ConfigureKestrel(serverOptions =>
+    {
+        // Railway injects PORT environment variable
+        var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+        serverOptions.ListenAnyIP(int.Parse(port));
+        Console.WriteLine($"[STARTUP] Configuring server to listen on port {port}");
+    });
+}
+
+// Add Swagger with documentation
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
+        Title = "Email Analyzer API",
+        Version = "v1",
+        Description = @"API for Email Analyzer application allowing for email analysis and semantic search.
+
+PL: API do aplikacji Email Analyzer umożliwiające analizę maili i wyszukiwanie semantyczne.
+
+Main features / Główne funkcjonalności:
+- OAuth2 authentication with Gmail and Outlook / Uwierzytelnianie OAuth2 z Gmail i Outlook
+- Email fetching and analysis / Pobieranie i analiza maili
+- AI-powered semantic search / Wyszukiwanie semantyczne wspierane przez AI
+- Email summaries and insights / Podsumowania i wnioski z maili",
+        Contact = new OpenApiContact
+        {
+            Name = "API Support",
+            Email = "support@emailanalyzer.com"
+        }
+    });
+    // Documentation XML file
+    var xmlFIle = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFIle); // xml path to the base directory
+    c.IncludeXmlComments(xmlPath);
 });
 
-// Konfiguracja logowania
+// Enable XML documentation
+builder.Services.AddControllers()
+    .AddJsonOptions(options => { options.JsonSerializerOptions.WriteIndented = true; })
+    .AddXmlSerializerFormatters();
+
+// Logging configuration
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
-// Konfiguracja email services
+// Email service configuration
 builder.Services.Configure<OutlookConfiguration>(
     builder.Configuration.GetSection("Outlook"));
 builder.Services.Configure<GmailConfiguration>(
     builder.Configuration.GetSection("Gmail"));
 
-// Rejestracja serwisów email
+// Email service registration
 builder.Services.AddScoped<OutlookEmailService>();
 builder.Services.AddScoped<GmailEmailService>();
-
-// Rejestracja factory dla serwisów email
 builder.Services.AddScoped<IEmailServiceFactory>(sp =>
-{
-    return new EmailServiceFactory(
+    new EmailServiceFactory(
         outlook: sp.GetRequiredService<OutlookEmailService>(),
         gmail: sp.GetRequiredService<GmailEmailService>()
-    );
-});
+    ));
 
-// Rejestracja TokenStorageService dla serwera
+// Token storage service
+builder.Services.AddSingleton<ServerTokenStorageService>();
 builder.Services.AddSingleton<ITokenStorageService, ServerTokenStorageService>();
 
-// Dodaj CORS
+// MongoDB configuration
+builder.Services.Configure<MongoDBConfiguration>(builder.Configuration.GetSection("MongoDB"));
+builder.Services.AddSingleton<MongoDBService>();
+builder.Services.AddScoped<EmailProcessingService>();
+
+// OpenAI configuration
+builder.Services.Configure<OpenAIConfiguration>(builder.Configuration.GetSection("OpenAI"));
+builder.Services.AddScoped<OpenAIService>();
+
+// Configure HttpClient for OpenAI service
+builder.Services.AddHttpClient<OpenAIService>();
+
+// CORS configuration
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", builder =>
     {
-        builder.AllowAnyOrigin()
+        builder.SetIsOriginAllowed(_ => true) // FIXME: PRODUCTION DELETE
             .AllowAnyMethod()
-            .AllowAnyHeader();
+            .AllowAnyHeader()
+            .AllowCredentials();
     });
 });
 
 builder.Services.AddControllers();
 
+
 var app = builder.Build();
 
+// Development specific middleware
 if (app.Environment.IsDevelopment())
 {
     app.UseDeveloperExceptionPage();
 }
 
+// Swagger UI dostępny również w produkcji
+app.UseSwagger();
+app.UseSwaggerUI();
+
+// Request logging middleware
 app.Use(async (context, next) =>
 {
-    Console.WriteLine($"[REQUEST] {context.Request.Method} {context.Request.Path} from {context.Connection.RemoteIpAddress}");
+    Console.WriteLine($"[REQUEST] {context.Request.Method} {context.Request.Path}");
     await next();
     Console.WriteLine($"[RESPONSE] {context.Response.StatusCode}");
 });
 
-
-// Dodaj middleware w odpowiedniej kolejności
 app.UseCors("AllowAll");
-app.UseHttpsRedirection();
+
+// Only use HTTPS redirection in production
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseRouting();
 app.UseAuthorization();
 
-// Konfiguracja routingu
 app.MapControllerRoute(
     name: "auth-callback",
     pattern: "auth/callback",
@@ -80,10 +144,4 @@ app.MapControllerRoute(
 
 app.MapControllers();
 
-app.Use(async (context, next) =>
-{
-    Console.WriteLine($"[MIDDLEWARE] Request: {context.Request.Method} {context.Request.Path}");
-    await next();
-    Console.WriteLine($"[MIDDLEWARE] Response: {context.Response.StatusCode}");
-});
 app.Run();

@@ -1,0 +1,154 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage 
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    x:Class="EmailAnalyzer.Client.Pages.SummaryPage"
+    Title="Email Analysis">
+
+    <Grid RowDefinitions="Auto,*,Auto,Auto" 
+          Padding="20"
+          RowSpacing="20">
+        
+        <!-- Header section -->
+        <VerticalStackLayout Grid.Row="0" Spacing="10">
+            <Label Text="{Binding AnalysisTitle}" 
+                   FontSize="24"
+                   HorizontalOptions="Center" />
+            <Label Text="{Binding DateRange}" 
+                   FontSize="16"
+                   HorizontalOptions="Center" />
+        </VerticalStackLayout>
+
+        <!-- Main content -->
+        <ScrollView Grid.Row="1">
+            <VerticalStackLayout Spacing="20">
+
+                <!-- Progress section -->
+                <Frame IsVisible="{Binding IsAnalyzing}"
+                       Padding="20"
+                       BorderColor="LightGray">
+                    <VerticalStackLayout Spacing="10">
+                        <Label Text="{Binding ProgressStatus}"
+                               HorizontalOptions="Center" />
+                        <ProgressBar Progress="{Binding AnalysisProgress}"
+                                     HorizontalOptions="Fill" />
+                    </VerticalStackLayout>
+                </Frame>
+
+                <!-- Results section -->
+                <Frame IsVisible="{Binding HasResults}"
+                       Padding="20"
+                       BorderColor="LightGray">
+                    <VerticalStackLayout Spacing="15">
+                        
+                        <Label Text="Summary"
+                               FontSize="20"
+                               FontAttributes="Bold" />
+                        
+                        <!-- Show the analysis summary -->
+                        <Label Text="{Binding Summary}"
+                               TextType="Html" />
+
+                        <Label Text="Key Insights"
+                               FontSize="20"
+                               FontAttributes="Bold" />
+
+                        <CollectionView ItemsSource="{Binding KeyInsights}"
+                                       Margin="0,10,0,0">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <Frame Margin="0,5" 
+                                           Padding="10"
+                                           BorderColor="LightGray">
+                                        <Label Text="{Binding .}" />
+                                    </Frame>
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                        
+                    </VerticalStackLayout>
+                </Frame>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Action buttons -->
+        <HorizontalStackLayout 
+            Grid.Row="2" 
+            Spacing="10"
+            HorizontalOptions="Center">
+            <Button Text="Export PDF"
+                    Command="{Binding ExportCommand}"
+                    IsEnabled="{Binding HasResults}" />
+            <Button Text="New Analysis"
+                    Command="{Binding NewAnalysisCommand}" />
+        </HorizontalStackLayout>
+
+        <!-- Chat/Search section -->
+        <Frame Grid.Row="3" 
+               BorderColor="LightGray" 
+               Padding="10">
+            <Grid RowDefinitions="Auto,*" 
+                  ColumnDefinitions="*,Auto">
+                
+                <!-- Search input and button -->
+                <Entry Grid.Row="0" 
+                       Grid.Column="0"
+                       Placeholder="Search in your emails..."
+                       Text="{Binding SearchQuery}"
+                       ReturnCommand="{Binding SearchCommand}"/>
+                
+                <Button Grid.Row="0" 
+                        Grid.Column="1"
+                        Text="Search"
+                        Command="{Binding SearchCommand}"
+                        Margin="10,0,0,0"/>
+
+                <!-- Search results -->
+                <CollectionView Grid.Row="1" 
+                              Grid.ColumnSpan="2"
+                              ItemsSource="{Binding SearchResults}"
+                              HeightRequest="300"
+                              Margin="0,10,0,0">
+                    <CollectionView.EmptyView>
+                        <VerticalStackLayout HorizontalOptions="Center" 
+                                           VerticalOptions="Center">
+                            <Label Text="No results found"
+                                   TextColor="Gray"
+                                   HorizontalOptions="Center"/>
+                        </VerticalStackLayout>
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <Frame Margin="0,5" 
+                                   Padding="10"
+                                   BorderColor="LightGray">
+                                <Grid RowDefinitions="Auto,Auto,Auto"
+                                      ColumnDefinitions="*,Auto">
+                                    <Label Grid.Row="0" 
+                                           Grid.ColumnSpan="2"
+                                           Text="{Binding Subject}"
+                                           FontAttributes="Bold"/>
+                                    <Label Grid.Row="1" 
+                                           Grid.Column="0"
+                                           Text="{Binding From}"
+                                           FontSize="Small"/>
+                                    <Label Grid.Row="1" 
+                                           Grid.Column="1"
+                                           Text="{Binding Similarity, StringFormat='Match: {0:P0}'}"
+                                           FontSize="Small"/>
+                                    <Label Grid.Row="2" 
+                                           Grid.ColumnSpan="2"
+                                           Text="{Binding Content}"
+                                           LineBreakMode="TailTruncation"
+                                           MaxLines="2"
+                                           FontSize="Small"/>
+                                </Grid>
+                            </Frame>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </Frame>
+    </Grid>
+</ContentPage>

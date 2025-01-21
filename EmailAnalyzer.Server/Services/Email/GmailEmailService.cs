@@ -24,15 +24,17 @@ public class GmailEmailService : IEmailService
     private readonly GmailConfiguration _config;
     private readonly ILogger<GmailEmailService> _logger;
     private GmailService? _gmailService;
+    private ServerTokenStorageService _tokenStorageService;
 
     public GmailEmailService(
         IOptions<GmailConfiguration> config,
-        ILogger<GmailEmailService> logger)
+        ILogger<GmailEmailService> logger, ServerTokenStorageService tokenStorageService)
     {
         _config = config.Value;
         _logger = logger;
+        _tokenStorageService = tokenStorageService;
 
-        _logger.LogInformation("GmailEmailService initialized with client ID: {ClientId}", 
+        _logger.LogInformation("GmailEmailService initialized with client ID: {ClientId}",
             _config.ClientId);
     }
 
@@ -56,14 +58,14 @@ public class GmailEmailService : IEmailService
 
             // Generate base URL
             var request = codeFlow.CreateAuthorizationCodeRequest(_config.RedirectUri);
-        
+
             var url = request.Build();
             var uriBuilder = new UriBuilder(url.AbsoluteUri);
             var query = System.Web.HttpUtility.ParseQueryString(uriBuilder.Query);
             query["access_type"] = "offline";
-            query["state"] = "gmail";  // Identyfikator providera
+            query["state"] = "gmail"; // Identyfikator providera
             uriBuilder.Query = query.ToString();
-        
+
             _logger.LogInformation("Generated Gmail authorization URL");
             return Task.FromResult(uriBuilder.Uri.ToString());
         }
@@ -95,14 +97,19 @@ public class GmailEmailService : IEmailService
                 });
 
             var token = await codeFlow.ExchangeCodeForTokenAsync(
-                "user", 
-                authCode, 
-                _config.RedirectUri, 
+                "user",
+                authCode,
+                _config.RedirectUri,
                 CancellationToken.None);
+            
+            // Log the token details
+            _logger.LogInformation("AccessToken: {AccessToken}, RefreshToken: {RefreshToken}, ExpiresIn: {ExpiresInSeconds}",
+                token.AccessToken, token.RefreshToken ?? "null", token.ExpiresInSeconds);
+
 
             // Initialize Gmail service
             var credential = GoogleCredential.FromAccessToken(token.AccessToken);
-            
+
             _gmailService = new GmailService(new BaseClientService.Initializer
             {
                 HttpClientInitializer = credential,
@@ -115,6 +122,7 @@ public class GmailEmailService : IEmailService
             {
                 Success = true,
                 AccessToken = token.AccessToken,
+                RefreshToken = token.RefreshToken,
                 ExpiresAt = DateTime.UtcNow.AddSeconds(token.ExpiresInSeconds ?? 3600)
             };
         }
@@ -127,6 +135,21 @@ public class GmailEmailService : IEmailService
 
     public async Task<List<EmailMessage>> GetEmailsByDateAsync(DateTime startDate, DateTime endDate)
     {
+        // Download auth token from saved file
+        var (accessToken, refreshToken, expiresAt) = await _tokenStorageService.GetTokenAsync("gmail");
+        if (string.IsNullOrEmpty(accessToken) || expiresAt <= DateTime.UtcNow)
+        {
+            _logger.LogWarning("Gmail token not found or expired. Please authenticate first.");
+            return new List<EmailMessage>();
+        }
+        
+        var credentials = GoogleCredential.FromAccessToken(accessToken); // Initialize Gmail service if not set
+        _gmailService = new GmailService(new BaseClientService.Initializer
+        {
+            HttpClientInitializer = credentials,
+            ApplicationName = "EmailAnalyzer"
+        });
+        
         if (_gmailService == null)
         {
             _logger.LogWarning("Gmail service not initialized. Authentication required.");
@@ -135,7 +158,7 @@ public class GmailEmailService : IEmailService
 
         try
         {
-            _logger.LogInformation("Fetching Gmail messages for date range: {StartDate} to {EndDate}", 
+            _logger.LogInformation("Fetching Gmail messages for date range: {StartDate} to {EndDate}",
                 startDate, endDate);
 
             var query = $"after:{startDate:yyyy/MM/dd} before:{endDate:yyyy/MM/dd}";
@@ -154,7 +177,7 @@ public class GmailEmailService : IEmailService
                         .ExecuteAsync();
 
                     var headers = emailDetail.Payload.Headers;
-                    
+
                     messages.Add(new EmailMessage
                     {
                         Id = emailDetail.Id,
@@ -182,7 +205,7 @@ public class GmailEmailService : IEmailService
     {
         try
         {
-            _logger.LogInformation("Attempting to refresh Gmail token for user: {UserId}", 
+            _logger.LogInformation("Attempting to refresh Gmail token for user: {UserId}",
                 credentials.UserId);
 
             var clientSecrets = new ClientSecrets
@@ -199,8 +222,8 @@ public class GmailEmailService : IEmailService
                 });
 
             var token = await codeFlow.RefreshTokenAsync(
-                "user", 
-                credentials.RefreshToken, 
+                "user",
+                credentials.RefreshToken,
                 CancellationToken.None);
 
             if (token == null)
