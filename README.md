@@ -30,7 +30,7 @@ The solution is divided into three main projects:
 
 The application follows a clean architecture pattern and consists of three main components:
 
-### Backend (.NET 7 Web API)
+### Backend (.NET 8 Web API)
 
 - REST API endpoints for email operations
 - Integration with OpenAI API
